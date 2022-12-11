@@ -59,7 +59,9 @@ def main():
 
     window = sg.Window("FalsiSignPy", layout, finalize=True)
     graph = window["-GRAPH-"]  # type: sg.Graph
+    graph.bind("<Leave>", "+LEAVE")
     floating_signature = None
+
 
     while True:
         event, values = window.read()
@@ -84,6 +86,10 @@ def main():
             signatures = graph.get_figures_at_location(cursor_position)
             for signature in signatures:
                 graph.delete_figure(signature)
+
+        elif event == "-GRAPH-+LEAVE":
+            if floating_signature is not None:
+                graph.delete_figure(floating_signature)
 
         elif event == "-GRAPH-+UP":
             floating_signature = None  # Anchor floating signature
