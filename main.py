@@ -30,7 +30,6 @@ def main():
         [sg.Text("Place signature:")],
         [sg.DropDown(["Signature1.png", "Signature2.png"])],
         [sg.Radio("Place", key="-PLACE-", group_id=0)],
-        [sg.Radio("Move", key="-MOVE-", group_id=0)],
         [sg.Radio("Remove", key="-REMOVE-", group_id=0)],
         [sg.HSeparator()],
         [sg.Radio("Preview", key="-PREVIEW-", group_id=0)],
@@ -46,7 +45,7 @@ def main():
                 enable_events=True,
                 background_color='lightblue',
                 drag_submits=True,
-                right_click_menu=[[], ['Erase item', ]]
+                motion_events=True,
             )
         ],
         [sg.Button("<", key="-PREVIOUS-"), sg.Text("Page 1 / 10", key="-CURRENT-PAGE-"), sg.Button(">", key="-NEXT-")],
@@ -59,54 +58,36 @@ def main():
     ]
 
     window = sg.Window("FalsiSignPy", layout, finalize=True)
-
     graph = window["-GRAPH-"]  # type: sg.Graph
-
-    dragging = False
-    drag_figures = []
-    lastxy = (None, None)
-    start_point = end_point = floating_signature = None
+    floating_signature = None
 
     while True:
         event, values = window.read()
-        print(event, values)
+
         if event == sg.WIN_CLOSED:
-            break  # exit
+            break
 
         if event == '-MOVE-':
             graph.set_cursor(cursor='fleur')
         elif not event.startswith('-GRAPH-'):
             graph.set_cursor(cursor='left_ptr')
 
-        if event == "-GRAPH-":  # if there's a "Graph" event, then it's a mouse
-            x, y = values["-GRAPH-"]
-            if not dragging:
-                start_point = (x, y)
-                dragging = True
-                drag_figures = graph.get_figures_at_location((x, y))
-                lastxy = x, y
-            else:
-                end_point = (x, y)
-            if floating_signature:
+        if event == "-GRAPH-+MOVE" and values["-PLACE-"]:
+            cursor_position = values["-GRAPH-"]
+
+            if floating_signature is not None:
                 graph.delete_figure(floating_signature)
-            delta_x, delta_y = x - lastxy[0], y - lastxy[1]
-            lastxy = x, y
-            if None not in (start_point, end_point):
-                if values['-MOVE-']:
-                    for fig in drag_figures:
-                        graph.move_figure(fig, delta_x, delta_y)
-                        graph.update()
-                elif values['-PLACE-']:
-                    floating_signature = graph.draw_image(data=logo200, location=start_point)
-                elif values['-REMOVE-']:
-                    for figure in drag_figures:
-                        graph.delete_figure(figure)
-            window["-INFO-"].update(value=f"mouse {values['-GRAPH-']}")
-        elif event.endswith("+UP"):  # The drawing has ended because mouse up
-            window["-INFO-"].update(value=f"grabbed rectangle from {start_point} to {end_point}")
-            start_point, end_point = None, None
-            dragging = False
-            floating_signature = None
+            floating_signature = graph.draw_image(data=logo200, location=cursor_position)
+
+        elif event == "-GRAPH-" and values["-REMOVE-"]:
+            cursor_position = values["-GRAPH-"]
+            signatures = graph.get_figures_at_location(cursor_position)
+            for signature in signatures:
+                graph.delete_figure(signature)
+
+        elif event == "-GRAPH-+UP":
+            floating_signature = None  # Anchor floating signature
+
         elif event == "-SAVE-":
             filename = sg.popup_get_file("Save pdf...", save_as=True)
             if filename is not None:
