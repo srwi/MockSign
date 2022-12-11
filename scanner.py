@@ -1,4 +1,5 @@
 import pathlib as pl
+from typing import List
 
 import fitz
 from PIL import Image
@@ -6,9 +7,10 @@ from PIL import Image
 
 class Scanner:
     def __init__(self):
-        self.pages = []
+        self.pages: List[Image] = []
 
     def open_pdf(self, path: pl.Path) -> None:
+        self.pages = []
         document = fitz.Document(path)
         for i in range(document.page_count):
             page = document.load_page(i)
@@ -24,5 +26,4 @@ class Scanner:
                            append_images=self.pages[1:])
 
     def get_transformed_page(self, page: int) -> Image:
-        # TODO: transform image
         return self.pages[page]
