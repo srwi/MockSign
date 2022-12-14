@@ -51,27 +51,30 @@ def main():
     ]
 
     col_right = [
+        [sg.Button("Save pdf...", key="-SAVE-")],
+        [sg.Button("<", key="-PREVIOUS-"), sg.Text("Page 1 / 10", key="-CURRENT-PAGE-"), sg.Button(">", key="-NEXT-")],
         [
             sg.Graph(
                 canvas_size=(400, 400),
                 graph_bottom_left=(0, 0),
                 graph_top_right=(800, 800),
+                expand_x=True,
+                expand_y=True,
                 key="-GRAPH-",
                 enable_events=True,
                 drag_submits=True,
                 motion_events=True,
             )
         ],
-        [sg.Button("<", key="-PREVIOUS-"), sg.Text("Page 1 / 10", key="-CURRENT-PAGE-"), sg.Button(">", key="-NEXT-")],
-        [sg.Button("Save pdf...", key="-SAVE-")]
     ]
 
     layout = [
-        [sg.Col(col_left), sg.Col(col_right)],
+        [sg.Col(col_left), sg.Col(col_right, expand_y=True, expand_x=True)],
         [sg.Text(key="-INFO-", size=(60, 1))]
     ]
 
     window = sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
+    window.bind("<Configure>", "-CONFIGURE-")
     graph: sg.Graph = window["-GRAPH-"]
     graph.bind("<Leave>", "+LEAVE")
     floating_signature = None
@@ -116,17 +119,17 @@ def main():
                 pass
 
         elif event == "-PREVIOUS-":
-            current_page -= 1
+            current_page = max(0, current_page - 1)
             if current_page_image is not None:
                 graph.delete_figure(current_page_image)
-            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page)), location=(0, 800))
+            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
             window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner.pages)}")
 
         elif event == "-NEXT-":
-            current_page += 1
+            current_page = min(current_page + 1, len(scanner.pages) - 1)
             if current_page_image is not None:
                 graph.delete_figure(current_page_image)
-            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page)), location=(0, 800))
+            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
             window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner.pages)}")
 
         elif event == "-INPUT-":
@@ -134,8 +137,14 @@ def main():
             scanner.open_pdf(pl.Path(filename))
             if current_page_image is not None:
                 graph.delete_figure(current_page_image)
-            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page)), location=(0, 800))
+            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
             window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner.pages)}")
+
+        elif event == "-CONFIGURE-":
+            if len(scanner.pages) > 0:
+                if current_page_image is not None:
+                    graph.delete_figure(current_page_image)
+                current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
 
     window.close()
 

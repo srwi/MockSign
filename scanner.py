@@ -1,5 +1,5 @@
 import pathlib as pl
-from typing import List
+from typing import List, Tuple, Optional
 
 import fitz
 from PIL import Image
@@ -14,7 +14,7 @@ class Scanner:
         document = fitz.Document(path)
         for i in range(document.page_count):
             page = document.load_page(i)
-            pixmap = page.get_pixmap()
+            pixmap = page.get_pixmap(dpi=150)
             image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
             self.pages.append(image)
 
@@ -25,5 +25,8 @@ class Scanner:
                            save_all=True,
                            append_images=self.pages[1:])
 
-    def get_transformed_page(self, page: int) -> Image:
-        return self.pages[page]
+    def get_transformed_page(self, page: int, resize: Optional[Tuple[int, int]] = None) -> Image:
+        image = self.pages[page]
+        if resize is not None:
+            image = image.resize(resize, Image.ANTIALIAS)
+        return image
