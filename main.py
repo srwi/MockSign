@@ -122,29 +122,29 @@ def main():
             current_page = max(0, current_page - 1)
             if current_page_image is not None:
                 graph.delete_figure(current_page_image)
-            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
-            window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner.pages)}")
+            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_page_image(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
+            window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner._pages)}")
 
         elif event == "-NEXT-":
-            current_page = min(current_page + 1, len(scanner.pages) - 1)
+            current_page = min(current_page + 1, len(scanner._pages) - 1)
             if current_page_image is not None:
                 graph.delete_figure(current_page_image)
-            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
-            window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner.pages)}")
+            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_page_image(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
+            window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner._pages)}")
 
         elif event == "-INPUT-":
             filename = values["-INPUT-"]
             scanner.open_pdf(pl.Path(filename))
             if current_page_image is not None:
                 graph.delete_figure(current_page_image)
-            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
-            window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner.pages)}")
+            current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_page_image(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
+            window["-CURRENT-PAGE-"].update(f"Page {current_page + 1} / {len(scanner._pages)}")
 
         elif event == "-CONFIGURE-":
-            if len(scanner.pages) > 0:
+            if len(scanner._pages) > 0:
                 if current_page_image is not None:
                     graph.delete_figure(current_page_image)
-                current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_transformed_page(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
+                current_page_image = graph.draw_image(data=convert_pil_image_to_byte_data(scanner.get_page_image(current_page, resize=window["-GRAPH-"].get_size())), location=(0, 800))
 
     window.close()
 
