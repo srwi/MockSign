@@ -1,66 +1,92 @@
-import pathlib as pl
-from typing import List, Tuple, Optional
-import numpy as np
-import cv2
-import fitz
-from PIL import Image
+import abc
+import collections
+from enum import Enum
+from typing import Tuple, Optional, Union, Dict
+
+from PIL import Image, ImageOps
+
+import utils
+
+
+class Filter(abc.ABC):
+    def __init__(self):
+        self._enabled = True
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value: bool) -> None:
+        self._enabled = value
+
+    @abc.abstractmethod
+    def _apply(self, image: Image.Image) -> Image.Image:
+        ...
+
+    def apply(self, image: Image.Image) -> Image.Image:
+        if not self._enabled:
+            return image
+
+        image = image.copy()
+        return self._apply(image)
+
+
+class FilterCollection(collections.Mapping):
+    def __init__(self) -> None:
+        self._filters: Dict[str, Filter] = {}
+
+    def __getitem__(self, key) -> Filter:
+        return self._filters[key]
+
+    def __len__(self) -> int:
+        return len(self._filters)
+
+    def __iter__(self):
+        return iter(self._filters)
+
+    def add(self, name: str, filter_: Filter) -> None:
+        self._filters[name] = filter_
+
+
+class InvertFilter(Filter):
+    def _apply(self, image: Image.Image) -> Image.Image:
+        return ImageOps.invert(image)
+
+
+class ScannerMode(Enum):
+    EDIT = 1
+    PREVIEW = 2
 
 
 class Scanner:
     def __init__(self):
-        self._pages: List[Image] = []
-        self._current_page: int = 0
-        self._preview_mode: bool = False
+        self._mode: ScannerMode = ScannerMode.EDIT
+        self._filters = FilterCollection()
 
-    def open_pdf(self, path: pl.Path) -> None:
-        self._pages = []
-        document = fitz.Document(path)
-        for i in range(document.page_count):
-            page = document.load_page(i)
-            pixmap = page.get_pixmap(dpi=150)
-            image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
-            self._pages.append(image)
+        self._filters.add("invert", InvertFilter())
 
-    def get_page_description(self) -> str:
-        if len(self._pages) == 0:
-            return ""
+    @property
+    def mode(self) -> ScannerMode:
+        return self._mode
 
-        return f"Page {self._current_page} of {len(self._pages)}"
+    @mode.setter
+    def mode(self, mode: ScannerMode) -> None:
+        self._mode = mode
 
-    def save_transformed_pdf(self, path: pl.Path) -> None:
-        if len(self._pages) == 0:
-            raise RuntimeError("Can not save empty document.")
+    @property
+    def filters(self) -> FilterCollection:
+        return self._filters
 
-        self._pages[0].save(path,
-                            "PDF",
-                            resolution=100.0,
-                            save_all=True,
-                            append_images=self._pages[1:])
+    def apply(self, page: Image.Image, resize: Optional[Tuple[int, int]] = None, as_bytes: bool = False) -> Union[Image.Image, bytes]:
+        if self._mode == ScannerMode.PREVIEW:
+            for filter_ in self._filters:
+                page = filter_.apply(page)
 
-    @staticmethod
-    def _resize_and_pad_image(image: Image, target_size) -> Image:
-        image = image.copy()
-
-        image_aspect_ratio = image.size[0] / image.size[1]
-        target_aspect_ratio = target_size[0] / target_size[1]
-
-        target_image = Image.new("RGB", target_size, "gray")
-
-        if image_aspect_ratio < target_aspect_ratio:
-            scaled_width = int(image.size[0] * target_size[1] / image.size[1])
-            image = image.resize((scaled_width, target_size[1]))
-            left_offset = (target_size[0] - scaled_width) // 2
-            target_image.paste(image, (left_offset, 0))
-        else:
-            scaled_height = int(image.size[1] * target_size[0] / image.size[0])
-            image = image.resize((target_size[0], scaled_height))
-            top_offset = (target_size[1] - scaled_height) // 2
-            target_image.paste(image, (0, top_offset))
-
-        return target_image
-
-    def get_page_image(self, page: int, resize: Optional[Tuple[int, int]] = None) -> Image:
-        image = self._pages[page]
         if resize is not None:
-            image = self._resize_and_pad_image(image, resize)
-        return image
+            page = utils.resize_and_pad_image(page, resize)
+
+        if as_bytes:
+            page = utils.convert_pil_image_to_byte_data(page)
+
+        return page
