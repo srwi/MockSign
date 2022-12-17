@@ -103,10 +103,6 @@ class FalsiSignPy:
         if self._floating_signature is not None:
             self._graph.delete_figure(self._floating_signature)
 
-    def on_graph_mouse_up(self, _: Dict[str, Any]):
-        # Anchor floating signature
-        self._floating_signature = None
-
     def on_signature_selected(self, values: Dict[str, Any]):
         self._selected_signature = self._loaded_signatures[values["-DROPDOWN-"]]
         self._scanner.mode = ScannerMode.EDIT
@@ -125,6 +121,9 @@ class FalsiSignPy:
                 if figure == self._current_page_image:
                     continue
                 self._graph.delete_figure(figure)
+        elif values["-PLACE-"]:
+            # Anchor floating signature
+            self._floating_signature = None
 
     @staticmethod
     def on_save_clicked(_: Dict[str, Any]):
@@ -168,7 +167,6 @@ class FalsiSignPy:
         self._event_handlers[sg.WIN_CLOSED] = self.on_win_closed
         self._event_handlers["-GRAPH-+MOVE"] = self.on_graph_move
         self._event_handlers["-GRAPH-+LEAVE"] = self.on_graph_leave
-        self._event_handlers["-GRAPH-+UP"] = self.on_graph_mouse_up
         self._event_handlers["-GRAPH-"] = self.on_graph_clicked
         self._event_handlers["-DROPDOWN-"] = self.on_signature_selected
         self._event_handlers["-PLACE-"] = self.on_signature_selected
@@ -185,11 +183,9 @@ class FalsiSignPy:
             if event in self._event_handlers.keys():
                 self._event_handlers[event](values)
 
-    def close(self):
         self._window.close()
 
 
 if __name__ == "__main__":
     app = FalsiSignPy()
     app.start()
-    app.close()
