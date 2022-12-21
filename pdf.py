@@ -55,5 +55,9 @@ class PDF:
         return len(self._pages)
 
     @property
+    def current_page(self) -> int:
+        return self._current_page
+
+    @property
     def loaded(self) -> bool:
         return len(self._pages) > 0

@@ -1,7 +1,8 @@
 import abc
 import collections
+import dataclasses
 from enum import Enum
-from typing import Tuple, Optional, Union, Dict
+from typing import Tuple, Optional, Union, Dict, List
 
 from PIL import Image, ImageOps
 
@@ -54,6 +55,19 @@ class InvertFilter(Filter):
         return ImageOps.invert(image)
 
 
+@dataclasses.dataclass
+class Signature:
+    image: Image.Image
+    page: int
+    location: Tuple[int, int]
+    scale: float
+    id: Optional[int] = None
+
+    def get_scaled(self) -> Image.Image:
+        new_size = int(self.image.size[0] * self.scale), int(self.image.size[1] * self.scale)
+        return self.image.resize(size=new_size)
+
+
 class ScannerMode(Enum):
     EDIT = 1
     PREVIEW = 2
@@ -63,6 +77,7 @@ class Scanner:
     def __init__(self):
         self._mode: ScannerMode = ScannerMode.EDIT
         self._filters = FilterCollection()
+        self._signatures: List[Signature] = []
 
         self._filters.add("invert", InvertFilter())
 
@@ -90,3 +105,6 @@ class Scanner:
             page = utils.convert_pil_image_to_byte_data(page)
 
         return page
+
+    def place_signature(self, signature: Signature) -> None:
+        self._signatures.append(signature)

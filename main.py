@@ -6,7 +6,7 @@ from PIL import Image
 
 import utils
 from pdf import PDF
-from scanner import Scanner, ScannerMode
+from scanner import Scanner, ScannerMode, Signature
 
 SIGNATURES_FOLDER = pl.Path("signatures")
 
@@ -16,12 +16,13 @@ class FalsiSignPy:
     def __init__(self):
         self._running = False
         self._scanner: Optional[Scanner] = None
-        self._floating_signature = None
-        self._selected_signature = None
-        self._current_page_image = None
+        self._current_page_figure = None
+        self._floating_signature_figure = None
+        self._selected_signature_image = None
         self._loaded_signatures = None
-        self._window = None
-        self._graph = None
+        self._signature_zoom_level = 1.
+        self._window: Optional[sg.Window] = None
+        self._graph: Optional[sg.Graph] = None
         self._pdf: Optional[PDF] = None
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
@@ -85,26 +86,33 @@ class FalsiSignPy:
 
     def update_page(self, page_image: Image.Image) -> None:
         new_page_image = self._scanner.apply(page_image, self._window["-GRAPH-"].get_size(), as_bytes=True)
-        if self._current_page_image is not None:
-            self._graph.delete_figure(self._current_page_image)
-        self._current_page_image = self._graph.draw_image(data=new_page_image, location=(0, 800))
+        if self._current_page_figure is not None:
+            self._graph.delete_figure(self._current_page_figure)
+        self._current_page_figure = self._graph.draw_image(data=new_page_image, location=(0, 800))
         self._window["-CURRENT-PAGE-"].update(self._pdf.page_description)
 
     def on_graph_move(self, values: Dict[str, Any]) -> None:
         if not values["-PLACE-"]:
             return
 
-        if self._floating_signature is not None:
-            self._graph.delete_figure(self._floating_signature)
+        if self._floating_signature_figure is not None:
+            self._graph.delete_figure(self._floating_signature_figure)
         cursor_position = values["-GRAPH-"]
-        self._floating_signature = self._graph.draw_image(data=self._selected_signature, location=cursor_position)
+        self._floating_signature_figure = self._graph.draw_image(data=self._selected_signature_image, location=cursor_position)
 
     def on_graph_leave(self, _: Dict[str, Any]):
-        if self._floating_signature is not None:
-            self._graph.delete_figure(self._floating_signature)
+        if self._floating_signature_figure is not None:
+            self._graph.delete_figure(self._floating_signature_figure)
+
+    def on_graph_mouse_wheel(self, values: Dict[str, Any]):
+        if not values["-PLACE-"]:
+            return
+
+        mouse_wheel_up = self._graph.user_bind_event.delta > 0
+        self._signature_zoom_level *= 1.1 if mouse_wheel_up else 0.9
 
     def on_signature_selected(self, values: Dict[str, Any]):
-        self._selected_signature = self._loaded_signatures[values["-DROPDOWN-"]]
+        self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
         self._scanner.mode = ScannerMode.EDIT
 
     def on_remove_selected(self, _: Dict[str, Any]):
@@ -114,16 +122,18 @@ class FalsiSignPy:
         self._scanner.mode = ScannerMode.PREVIEW
 
     def on_graph_clicked(self, values: Dict[str, Any]):
+        cursor_position = values["-GRAPH-"]
         if values["-REMOVE-"]:
-            cursor_position = values["-GRAPH-"]
             figures_at_location = self._graph.get_figures_at_location(cursor_position)
             for figure in figures_at_location:
-                if figure == self._current_page_image:
+                if figure == self._current_page_figure:
                     continue
                 self._graph.delete_figure(figure)
         elif values["-PLACE-"]:
+            placed_signature = Signature(self._selected_signature_image, self._pdf.current_page, cursor_position, self._signature_zoom_level, self._floating_signature_figure)
+            self._scanner.place_signature(placed_signature)
             # Anchor floating signature
-            self._floating_signature = None
+            self._floating_signature_figure = None
 
     @staticmethod
     def on_save_clicked(_: Dict[str, Any]):
@@ -163,10 +173,12 @@ class FalsiSignPy:
 
         self._graph: sg.Graph = self._window["-GRAPH-"]
         self._graph.bind("<Leave>", "+LEAVE")
+        self._graph.bind("<MouseWheel>", "+WHEEL")
 
         self._event_handlers[sg.WIN_CLOSED] = self.on_win_closed
         self._event_handlers["-GRAPH-+MOVE"] = self.on_graph_move
         self._event_handlers["-GRAPH-+LEAVE"] = self.on_graph_leave
+        self._event_handlers["-GRAPH-+WHEEL"] = self.on_graph_mouse_wheel
         self._event_handlers["-GRAPH-"] = self.on_graph_clicked
         self._event_handlers["-DROPDOWN-"] = self.on_signature_selected
         self._event_handlers["-PLACE-"] = self.on_signature_selected
