@@ -1,12 +1,11 @@
 import abc
-import collections
-import dataclasses
 from enum import Enum
 from typing import Tuple, Optional, Union, Dict, List
-
+from collections.abc import Mapping
 from PIL import Image, ImageOps
 
 import utils
+from signature import Signature
 
 
 class Filter(abc.ABC):
@@ -33,7 +32,7 @@ class Filter(abc.ABC):
         return self._apply(image)
 
 
-class FilterCollection(collections.Mapping):
+class FilterCollection(Mapping):
     def __init__(self) -> None:
         self._filters: Dict[str, Filter] = {}
 
@@ -53,19 +52,6 @@ class FilterCollection(collections.Mapping):
 class InvertFilter(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
         return ImageOps.invert(image)
-
-
-@dataclasses.dataclass
-class Signature:
-    image: Image.Image
-    page: int
-    location: Tuple[int, int]
-    scale: float
-    id: Optional[int] = None
-
-    def get_scaled(self) -> Image.Image:
-        new_size = int(self.image.size[0] * self.scale), int(self.image.size[1] * self.scale)
-        return self.image.resize(size=new_size)
 
 
 class ScannerMode(Enum):

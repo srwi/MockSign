@@ -40,7 +40,7 @@ class PDF:
         return self.get_current_page()
 
     def select_and_get_previous_page(self) -> Image.Image:
-        self._current_page = max(self._current_page + 1, 0)
+        self._current_page = max(self._current_page - 1, 0)
         return self.get_current_page()
 
     @property

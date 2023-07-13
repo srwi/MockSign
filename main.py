@@ -1,5 +1,5 @@
 import pathlib as pl
-from typing import Dict, Callable, Any, Optional
+from typing import Dict, Callable, Any, Optional, Tuple
 
 import PySimpleGUI as sg
 from PIL import Image
@@ -76,13 +76,27 @@ class FalsiSignPy:
     def load_signatures_or_fail(path: pl.Path):
         signatures = {}
         for file in path.glob("*"):
-            image = Image.open(file)
-            signatures[file.name] = utils.convert_pil_image_to_byte_data(image)
+            signatures[file.name] = Image.open(file)
         if len(signatures) == 0:
             sg.popup_error(f"No signatures found. Place some signatures inside of the '{SIGNATURES_FOLDER}' folder and restart FalsiSignPy.",
                            title="No signatures found")
             exit(1)
         return signatures
+
+    def _place_scaled_signature(self, signature_image: Image.Image, cursor_position: Tuple[int, int], floating: bool) -> None:
+        new_size = (int(signature_image.width * self._signature_zoom_level),
+                    int(signature_image.height * self._signature_zoom_level))
+        scaled_signature_image = signature_image.copy().resize(new_size)
+        scaled_signature_bytes = utils.convert_pil_image_to_byte_data(scaled_signature_image)
+        signature_position = (cursor_position[0] - scaled_signature_image.width // 2,
+                              cursor_position[1] + scaled_signature_image.height // 2)
+
+        placed_figure = self._graph.draw_image(data=scaled_signature_bytes, location=signature_position)
+        if self._floating_signature_figure is not None:
+            self._graph.delete_figure(self._floating_signature_figure)
+            self._floating_signature_figure = None
+        if floating:
+            self._floating_signature_figure = placed_figure
 
     def update_page(self, page_image: Image.Image) -> None:
         new_page_image = self._scanner.apply(page_image, self._window["-GRAPH-"].get_size(), as_bytes=True)
@@ -95,10 +109,8 @@ class FalsiSignPy:
         if not values["-PLACE-"]:
             return
 
-        if self._floating_signature_figure is not None:
-            self._graph.delete_figure(self._floating_signature_figure)
         cursor_position = values["-GRAPH-"]
-        self._floating_signature_figure = self._graph.draw_image(data=self._selected_signature_image, location=cursor_position)
+        self._place_scaled_signature(self._selected_signature_image, cursor_position, floating=True)
 
     def on_graph_leave(self, _: Dict[str, Any]):
         if self._floating_signature_figure is not None:
@@ -110,6 +122,9 @@ class FalsiSignPy:
 
         mouse_wheel_up = self._graph.user_bind_event.delta > 0
         self._signature_zoom_level *= 1.1 if mouse_wheel_up else 0.9
+
+        cursor_position = values["-GRAPH-"]
+        self._place_scaled_signature(self._selected_signature_image, cursor_position, floating=True)
 
     def on_signature_selected(self, values: Dict[str, Any]):
         self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
@@ -130,7 +145,11 @@ class FalsiSignPy:
                     continue
                 self._graph.delete_figure(figure)
         elif values["-PLACE-"]:
-            placed_signature = Signature(self._selected_signature_image, self._pdf.current_page, cursor_position, self._signature_zoom_level, self._floating_signature_figure)
+            placed_signature = Signature(self._selected_signature_image,
+                                         self._pdf.current_page if self._pdf else 0,
+                                         cursor_position,
+                                         self._signature_zoom_level,
+                                         self._floating_signature_figure)
             self._scanner.place_signature(placed_signature)
             # Anchor floating signature
             self._floating_signature_figure = None
