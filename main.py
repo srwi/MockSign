@@ -169,10 +169,16 @@ class FalsiSignPy:
         page_signatures = self._pdf.get_current_page_signatures()
         self._pdf.clear_current_page_signatures()
         for signature in page_signatures:
+            scaled_signature = signature.get_scaled_signature()
             graph_location = utils.page_to_graph_coordinates(signature.get_location(),
                                                              self._graph.get_size(),
                                                              self._pdf.get_current_page_image().size)
-            signature_id = self._graph.draw_image(data=signature.get_scaled_signature(as_bytes=True),
+            graph_location = (
+                graph_location[0] - scaled_signature.width // 2,
+                graph_location[1] + scaled_signature.height // 2
+            )
+            scaled_signature_bytes = utils.image_to_bytes(scaled_signature)
+            signature_id = self._graph.draw_image(data=scaled_signature_bytes,
                                                   location=graph_location)
             self._pdf.place_signature(signature=signature, identifier=signature_id)
 
