@@ -63,21 +63,11 @@ class Scanner:
     def __init__(self):
         self._mode: ScannerMode = ScannerMode.EDIT
         self._filters = FilterCollection()
-        self._signatures: List[Signature] = []
 
         self._filters.add("invert", InvertFilter())
 
-    @property
-    def mode(self) -> ScannerMode:
-        return self._mode
-
-    @mode.setter
-    def mode(self, mode: ScannerMode) -> None:
+    def set_mode(self, mode: ScannerMode) -> None:
         self._mode = mode
-
-    @property
-    def filters(self) -> FilterCollection:
-        return self._filters
 
     def apply(self, page: Image.Image, resize: Optional[Tuple[int, int]] = None, as_bytes: bool = False) -> Union[Image.Image, bytes]:
         if self._mode == ScannerMode.PREVIEW:
@@ -88,9 +78,6 @@ class Scanner:
             page = utils.resize_and_pad_image(page, resize)
 
         if as_bytes:
-            page = utils.convert_pil_image_to_byte_data(page)
+            page = utils.image_to_bytes(page)
 
         return page
-
-    def place_signature(self, signature: Signature) -> None:
-        self._signatures.append(signature)

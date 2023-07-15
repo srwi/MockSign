@@ -4,7 +4,7 @@ from typing import Tuple
 from PIL import Image
 
 
-def convert_pil_image_to_byte_data(image: Image.Image) -> bytes:
+def image_to_bytes(image: Image.Image) -> bytes:
     output = io.BytesIO()
     image.save(output, format="PNG")
     return output.getvalue()

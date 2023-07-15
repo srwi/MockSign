@@ -1,7 +1,10 @@
 import pathlib as pl
+from typing import List, Dict
 
 import fitz
 from PIL import Image
+
+from signature import Signature
 
 
 class PDF:
@@ -16,6 +19,14 @@ class PDF:
             image = Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
             self._pages.append(image)
 
+        self._signatures: List[Dict[int, Signature]] = [{} for _ in self._pages]
+
+    def place_signature(self, signature: Signature, identifier: int) -> None:
+        self._signatures[self._current_page][identifier] = signature
+
+    def delete_signature(self, identifier: int) -> None:
+        del self._signatures[self._current_page][identifier]
+
     def save(self, path: pl.Path) -> None:
         if len(self._pages) == 0:
             raise RuntimeError("Can not save empty document.")
@@ -26,22 +37,28 @@ class PDF:
                             save_all=True,
                             append_images=self._pages[1:])
 
-    def get_current_page(self) -> Image.Image:
-        return self.get_page(self._current_page)
+    def get_current_page_image(self) -> Image.Image:
+        return self.get_page_image(self._current_page)
 
-    def get_page(self, page_number: int) -> Image.Image:
+    def get_page_image(self, page_number: int) -> Image.Image:
         if not self.loaded:
             raise RuntimeError("No pdf loaded.")
 
         return self._pages[page_number]
 
-    def select_and_get_next_page(self) -> Image.Image:
-        self._current_page = min(self._current_page + 1, self.num_pages - 1)
-        return self.get_current_page()
+    def get_page_signatures(self, page_number: int) -> List[Signature]:
+        return list(self._signatures[page_number].values())
 
-    def select_and_get_previous_page(self) -> Image.Image:
+    def get_current_page_signatures(self) -> List[Signature]:
+        return self.get_page_signatures(self._current_page)
+
+    def select_and_get_next_page_image(self) -> Image.Image:
+        self._current_page = min(self._current_page + 1, self.num_pages - 1)
+        return self.get_current_page_image()
+
+    def select_and_get_previous_page_image(self) -> Image.Image:
         self._current_page = max(self._current_page - 1, 0)
-        return self.get_current_page()
+        return self.get_current_page_image()
 
     @property
     def page_description(self) -> str:

@@ -16,8 +16,8 @@ class FalsiSignPy:
     def __init__(self):
         self._running = False
         self._scanner: Optional[Scanner] = None
-        self._current_page_figure = None
-        self._floating_signature_figure = None
+        self._current_page_figure_id = None
+        self._floating_signature_figure_id: Optional[int] = None
         self._selected_signature_image = None
         self._loaded_signatures = None
         self._signature_zoom_level = 1.
@@ -49,7 +49,7 @@ class FalsiSignPy:
 
         col_right = [
             [sg.Button("Save pdf...", key="-SAVE-")],
-            [sg.Button("<", key="-PREVIOUS-"), sg.Text("Page 1 / 10", key="-CURRENT-PAGE-"), sg.Button(">", key="-NEXT-")],
+            [sg.Button("<", key="-PREVIOUS-"), sg.Text("No file loaded", key="-CURRENT-PAGE-"), sg.Button(">", key="-NEXT-")],
             [
                 sg.Graph(
                     canvas_size=(400, 400),
@@ -83,26 +83,25 @@ class FalsiSignPy:
             exit(1)
         return signatures
 
-    def _place_scaled_signature(self, signature_image: Image.Image, cursor_position: Tuple[int, int], floating: bool) -> None:
+    def _place_floating_signature(self, signature_image: Image.Image, cursor_position: Tuple[int, int]) -> None:
         new_size = (int(signature_image.width * self._signature_zoom_level),
                     int(signature_image.height * self._signature_zoom_level))
         scaled_signature_image = signature_image.copy().resize(new_size)
-        scaled_signature_bytes = utils.convert_pil_image_to_byte_data(scaled_signature_image)
+        scaled_signature_bytes = utils.image_to_bytes(scaled_signature_image)
         signature_position = (cursor_position[0] - scaled_signature_image.width // 2,
                               cursor_position[1] + scaled_signature_image.height // 2)
 
-        placed_figure = self._graph.draw_image(data=scaled_signature_bytes, location=signature_position)
-        if self._floating_signature_figure is not None:
-            self._graph.delete_figure(self._floating_signature_figure)
-            self._floating_signature_figure = None
-        if floating:
-            self._floating_signature_figure = placed_figure
+        placed_figure: int = self._graph.draw_image(data=scaled_signature_bytes, location=signature_position)
+        if self._floating_signature_figure_id is not None:
+            self._graph.delete_figure(self._floating_signature_figure_id)
+            self._floating_signature_figure_id = None
+        self._floating_signature_figure_id = placed_figure
 
     def update_page(self, page_image: Image.Image) -> None:
         new_page_image = self._scanner.apply(page_image, self._window["-GRAPH-"].get_size(), as_bytes=True)
-        if self._current_page_figure is not None:
-            self._graph.delete_figure(self._current_page_figure)
-        self._current_page_figure = self._graph.draw_image(data=new_page_image, location=(0, 800))
+        if self._current_page_figure_id is not None:
+            self._graph.delete_figure(self._current_page_figure_id)
+        self._current_page_figure_id = self._graph.draw_image(data=new_page_image, location=(0, 800))
         self._window["-CURRENT-PAGE-"].update(self._pdf.page_description)
 
     def on_graph_move(self, values: Dict[str, Any]) -> None:
@@ -110,11 +109,11 @@ class FalsiSignPy:
             return
 
         cursor_position = values["-GRAPH-"]
-        self._place_scaled_signature(self._selected_signature_image, cursor_position, floating=True)
+        self._place_floating_signature(self._selected_signature_image, cursor_position)
 
     def on_graph_leave(self, _: Dict[str, Any]):
-        if self._floating_signature_figure is not None:
-            self._graph.delete_figure(self._floating_signature_figure)
+        if self._floating_signature_figure_id is not None:
+            self._graph.delete_figure(self._floating_signature_figure_id)
 
     def on_graph_mouse_wheel(self, values: Dict[str, Any]):
         if not values["-PLACE-"]:
@@ -124,35 +123,38 @@ class FalsiSignPy:
         self._signature_zoom_level *= 1.1 if mouse_wheel_up else 0.9
 
         cursor_position = values["-GRAPH-"]
-        self._place_scaled_signature(self._selected_signature_image, cursor_position, floating=True)
+        self._place_floating_signature(self._selected_signature_image, cursor_position)
 
     def on_signature_selected(self, values: Dict[str, Any]):
         self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
-        self._scanner.mode = ScannerMode.EDIT
+        self._scanner.set_mode(ScannerMode.EDIT)
 
     def on_remove_selected(self, _: Dict[str, Any]):
-        self._scanner.mode = ScannerMode.EDIT
+        self._scanner.set_mode(ScannerMode.EDIT)
 
     def on_preview_selected(self, _: Dict[str, Any]):
-        self._scanner.mode = ScannerMode.PREVIEW
+        self._scanner.set_mode(ScannerMode.PREVIEW)
 
     def on_graph_clicked(self, values: Dict[str, Any]):
         cursor_position = values["-GRAPH-"]
         if values["-REMOVE-"]:
-            figures_at_location = self._graph.get_figures_at_location(cursor_position)
-            for figure in figures_at_location:
-                if figure == self._current_page_figure:
+            figure_ids_at_location = self._graph.get_figures_at_location(cursor_position)
+            for id_ in reversed(figure_ids_at_location):
+                if id_ == self._current_page_figure_id:
                     continue
-                self._graph.delete_figure(figure)
+                self._graph.delete_figure(id_)
+                self._pdf.delete_signature(id_)
+                break  # Delete only a single signature at a time
         elif values["-PLACE-"]:
-            placed_signature = Signature(self._selected_signature_image,
-                                         self._pdf.current_page if self._pdf else 0,
-                                         cursor_position,
-                                         self._signature_zoom_level,
-                                         self._floating_signature_figure)
-            self._scanner.place_signature(placed_signature)
+            if not self._pdf:
+                print("Please load a PDF file before placing signatures.")
+                return
+            placed_signature = Signature(image=self._selected_signature_image,
+                                         location=cursor_position,
+                                         scale=self._signature_zoom_level,)
+            self._pdf.place_signature(placed_signature, self._floating_signature_figure_id)
             # Anchor floating signature
-            self._floating_signature_figure = None
+            self._floating_signature_figure_id = None
 
     @staticmethod
     def on_save_clicked(_: Dict[str, Any]):
@@ -161,22 +163,22 @@ class FalsiSignPy:
             pass
 
     def on_previous_page_clicked(self, _: Dict[str, Any]):
-        previous_page = self._pdf.select_and_get_previous_page()
+        previous_page = self._pdf.select_and_get_previous_page_image()
         self.update_page(previous_page)
 
     def on_next_page_clicked(self, _: Dict[str, Any]):
-        next_page = self._pdf.select_and_get_next_page()
+        next_page = self._pdf.select_and_get_next_page_image()
         self.update_page(next_page)
 
     def on_input_file_selected(self, values: Dict[str, Any]):
-        filename = values["-INPUT-"]
-        self._pdf = PDF(pl.Path(filename))
-        current_page = self._pdf.get_current_page()
+        filename = pl.Path(values["-INPUT-"])
+        self._pdf = PDF(filename)
+        current_page = self._pdf.get_current_page_image()
         self.update_page(current_page)
 
     def on_window_resized(self, _: Dict[str, Any]):
         if self._pdf is not None and self._pdf.loaded:
-            current_page = self._pdf.get_current_page()
+            current_page = self._pdf.get_current_page_image()
             self.update_page(current_page)
 
     def on_win_closed(self, _: Dict[str, Any]) -> None:
@@ -185,7 +187,7 @@ class FalsiSignPy:
     def start(self):
         self._running = True
         self._scanner = Scanner()
-        self._loaded_signatures = self.load_signatures_or_fail(pl.Path(SIGNATURES_FOLDER))
+        self._loaded_signatures = self.load_signatures_or_fail(SIGNATURES_FOLDER)
 
         self._window: sg.Window = self.create_window()
         self._window.bind("<Configure>", "-CONFIGURE-")
