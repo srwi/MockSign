@@ -29,6 +29,9 @@ class Signature:
 
         return self._scaled_bytes_cache
 
+    def get_location(self) -> Tuple[int, int]:
+        return self._location
+
     def set_scale(self, value) -> None:
         if value != self._scale:
             self._scale = value

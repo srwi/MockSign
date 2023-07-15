@@ -52,6 +52,9 @@ class PDF:
     def get_current_page_signatures(self) -> List[Signature]:
         return self.get_page_signatures(self._current_page)
 
+    def clear_current_page_signatures(self) -> None:
+        self._signatures[self._current_page] = {}
+
     def select_and_get_next_page_image(self) -> Image.Image:
         self._current_page = min(self._current_page + 1, self.num_pages - 1)
         return self.get_current_page_image()
