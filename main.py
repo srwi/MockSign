@@ -149,9 +149,12 @@ class FalsiSignPy:
             if not self._pdf:
                 print("Please load a PDF file before placing signatures.")
                 return
+            location = utils.graph_to_page_coordinates(cursor_position,
+                                                       self._graph.get_size(),
+                                                       self._pdf.get_current_page_image().size)
             placed_signature = Signature(image=self._selected_signature_image,
-                                         location=cursor_position,
-                                         scale=self._signature_zoom_level,)
+                                         location=location,
+                                         scale=self._signature_zoom_level)
             self._pdf.place_signature(placed_signature, self._floating_signature_figure_id)
             # Anchor floating signature
             self._floating_signature_figure_id = None
@@ -166,8 +169,11 @@ class FalsiSignPy:
         page_signatures = self._pdf.get_current_page_signatures()
         self._pdf.clear_current_page_signatures()
         for signature in page_signatures:
+            graph_location = utils.page_to_graph_coordinates(signature.get_location(),
+                                                             self._graph.get_size(),
+                                                             self._pdf.get_current_page_image().size)
             signature_id = self._graph.draw_image(data=signature.get_scaled_signature(as_bytes=True),
-                                                  location=signature.get_location())
+                                                  location=graph_location)
             self._pdf.place_signature(signature=signature, identifier=signature_id)
 
     def on_previous_page_clicked(self, _: Dict[str, Any]):
