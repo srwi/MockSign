@@ -162,29 +162,23 @@ class FalsiSignPy:
         if filename is not None:
             pass
 
-    def on_previous_page_clicked(self, _: Dict[str, Any]):
-        previous_page = self._pdf.select_and_get_previous_page_image()
-        self.update_page(previous_page)
-
-        # PDF signatures need to be updated because of new identifiers
-        previous_page_signatures = self._pdf.get_current_page_signatures()
+    def _redraw_page_signatures(self):
+        page_signatures = self._pdf.get_current_page_signatures()
         self._pdf.clear_current_page_signatures()
-        for signature in previous_page_signatures:
+        for signature in page_signatures:
             signature_id = self._graph.draw_image(data=signature.get_scaled_signature(as_bytes=True),
                                                   location=signature.get_location())
             self._pdf.place_signature(signature=signature, identifier=signature_id)
+
+    def on_previous_page_clicked(self, _: Dict[str, Any]):
+        previous_page = self._pdf.select_and_get_previous_page_image()
+        self.update_page(previous_page)
+        self._redraw_page_signatures()
 
     def on_next_page_clicked(self, _: Dict[str, Any]):
         next_page = self._pdf.select_and_get_next_page_image()
         self.update_page(next_page)
-
-        # PDF signatures need to be updated because of new identifiers
-        next_page_signatures = self._pdf.get_current_page_signatures()
-        self._pdf.clear_current_page_signatures()
-        for signature in next_page_signatures:
-            signature_id = self._graph.draw_image(data=signature.get_scaled_signature(as_bytes=True),
-                                                  location=signature.get_location())
-            self._pdf.place_signature(signature=signature, identifier=signature_id)
+        self._redraw_page_signatures()
 
     def on_input_file_selected(self, values: Dict[str, Any]):
         filename = pl.Path(values["-INPUT-"])
