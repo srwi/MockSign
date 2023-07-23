@@ -1,11 +1,9 @@
 import abc
-from enum import Enum
-from typing import Tuple, Optional, Union, Dict, List
 from collections.abc import Mapping
-from PIL import Image, ImageOps
+from enum import Enum
+from typing import Dict
 
-import utils
-from signature import Signature
+from PIL import Image, ImageOps
 
 
 class Filter(abc.ABC):
@@ -69,15 +67,9 @@ class Scanner:
     def set_mode(self, mode: ScannerMode) -> None:
         self._mode = mode
 
-    def apply(self, page: Image.Image, resize: Optional[Tuple[int, int]] = None, as_bytes: bool = False) -> Union[Image.Image, bytes]:
+    def apply(self, page: Image.Image) -> Image.Image:
         if self._mode == ScannerMode.PREVIEW:
             for filter_ in self._filters:
                 page = filter_.apply(page)
-
-        if resize is not None:
-            page = utils.resize_and_pad_image(page, resize)
-
-        if as_bytes:
-            page = utils.image_to_bytes(page)
 
         return page

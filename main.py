@@ -1,4 +1,6 @@
+import ctypes
 import pathlib as pl
+import platform
 from typing import Dict, Callable, Any, Optional, Tuple
 
 import PySimpleGUI as sg
@@ -6,7 +8,8 @@ from PIL import Image
 
 import utils
 from pdf import PDF
-from scanner import Scanner, ScannerMode, Signature
+from scanner import Scanner, ScannerMode
+from signature import Signature
 
 SIGNATURES_FOLDER = pl.Path("signatures")
 
@@ -54,7 +57,7 @@ class FalsiSignPy:
                 sg.Graph(
                     canvas_size=(400, 400),
                     graph_bottom_left=(0, 0),
-                    graph_top_right=(800, 800),
+                    graph_top_right=(400, 400),
                     expand_x=True,
                     expand_y=True,
                     key="-GRAPH-",
@@ -98,17 +101,38 @@ class FalsiSignPy:
         self._floating_signature_figure_id = placed_figure
 
     def update_page(self, page_image: Image.Image) -> None:
-        new_page_image = self._scanner.apply(page_image, self._window["-GRAPH-"].get_size(), as_bytes=True)
+        new_page_image = self._scanner.apply(page_image)
+
+        # Match document coordinate system
+        graph_size = self._graph.get_size()
+        _, _, _, _, scaling_factor = utils.calculate_padded_image_coordinates(new_page_image.size, graph_size)
+        h_offset = ((graph_size[0] * scaling_factor) - new_page_image.width) / 2
+        v_offset = ((graph_size[1] * scaling_factor) - new_page_image.height) / 2
+        self._graph.CanvasSize = graph_size
+        self._graph.change_coordinates(
+            graph_bottom_left=(-h_offset, -v_offset),
+            graph_top_right=(new_page_image.width + h_offset, new_page_image.height + v_offset)
+        )
+
+        # Update page figure
+        new_page_image_resized = utils.resize_and_pad_image(new_page_image, target_size=graph_size)
         if self._current_page_figure_id is not None:
             self._graph.delete_figure(self._current_page_figure_id)
-        self._current_page_figure_id = self._graph.draw_image(data=new_page_image, location=(0, 800))
+        self._current_page_figure_id = self._graph.draw_image(
+            data=utils.image_to_bytes(new_page_image_resized),
+            location=(-h_offset, 2 * v_offset + new_page_image.height)
+        )
+
         self._window["-CURRENT-PAGE-"].update(self._pdf.page_description)
 
+        self._redraw_page_signatures()
+
     def on_graph_move(self, values: Dict[str, Any]) -> None:
+        cursor_position = values["-GRAPH-"]
+        print(cursor_position)
         if not values["-PLACE-"]:
             return
 
-        cursor_position = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_position)
 
     def on_graph_leave(self, _: Dict[str, Any]):
@@ -185,12 +209,10 @@ class FalsiSignPy:
     def on_previous_page_clicked(self, _: Dict[str, Any]):
         previous_page = self._pdf.select_and_get_previous_page_image()
         self.update_page(previous_page)
-        self._redraw_page_signatures()
 
     def on_next_page_clicked(self, _: Dict[str, Any]):
         next_page = self._pdf.select_and_get_next_page_image()
         self.update_page(next_page)
-        self._redraw_page_signatures()
 
     def on_input_file_selected(self, values: Dict[str, Any]):
         filename = pl.Path(values["-INPUT-"])
@@ -242,5 +264,8 @@ class FalsiSignPy:
 
 
 if __name__ == "__main__":
+    if int(platform.release()) >= 8:
+        ctypes.windll.shcore.SetProcessDpiAwareness(True)
+
     app = FalsiSignPy()
     app.start()
