@@ -105,10 +105,10 @@ class FalsiSignPy:
 
         # Match document coordinate system
         graph_size = self._graph.get_size()
+        self._graph.CanvasSize = graph_size
         _, _, _, _, scaling_factor = utils.calculate_padded_image_coordinates(new_page_image.size, graph_size)
         h_offset = ((graph_size[0] * scaling_factor) - new_page_image.width) / 2
         v_offset = ((graph_size[1] * scaling_factor) - new_page_image.height) / 2
-        self._graph.CanvasSize = graph_size
         self._graph.change_coordinates(
             graph_bottom_left=(-h_offset, -v_offset),
             graph_top_right=(new_page_image.width + h_offset, new_page_image.height + v_offset)
@@ -128,11 +128,10 @@ class FalsiSignPy:
         self._redraw_page_signatures()
 
     def on_graph_move(self, values: Dict[str, Any]) -> None:
-        cursor_position = values["-GRAPH-"]
-        print(cursor_position)
         if not values["-PLACE-"]:
             return
 
+        cursor_position = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_position)
 
     def on_graph_leave(self, _: Dict[str, Any]):
@@ -173,11 +172,8 @@ class FalsiSignPy:
             if not self._pdf:
                 print("Please load a PDF file before placing signatures.")
                 return
-            location = utils.graph_to_page_coordinates(cursor_position,
-                                                       self._graph.get_size(),
-                                                       self._pdf.get_current_page_image().size)
             placed_signature = Signature(image=self._selected_signature_image,
-                                         location=location,
+                                         location=cursor_position,
                                          scale=self._signature_zoom_level)
             self._pdf.place_signature(placed_signature, self._floating_signature_figure_id)
             # Anchor floating signature
@@ -194,9 +190,7 @@ class FalsiSignPy:
         self._pdf.clear_current_page_signatures()
         for signature in page_signatures:
             scaled_signature = signature.get_scaled_signature()
-            graph_location = utils.page_to_graph_coordinates(signature.get_location(),
-                                                             self._graph.get_size(),
-                                                             self._pdf.get_current_page_image().size)
+            graph_location = signature.get_location()
             graph_location = (
                 graph_location[0] - scaled_signature.width // 2,
                 graph_location[1] + scaled_signature.height // 2
