@@ -105,7 +105,7 @@ class FalsiSignPy:
 
         # Match document coordinate system
         graph_size = self._graph.get_size()
-        self._graph.CanvasSize = graph_size
+        self._graph.CanvasSize = graph_size  # https://github.com/PySimpleGUI/PySimpleGUI/issues/6451
         _, _, _, _, scaling_factor = utils.calculate_padded_image_coordinates(new_page_image.size, graph_size)
         h_offset = ((graph_size[0] * scaling_factor) - new_page_image.width) / 2
         v_offset = ((graph_size[1] * scaling_factor) - new_page_image.height) / 2
@@ -120,7 +120,7 @@ class FalsiSignPy:
             self._graph.delete_figure(self._current_page_figure_id)
         self._current_page_figure_id = self._graph.draw_image(
             data=utils.image_to_bytes(new_page_image_resized),
-            location=(-h_offset, 2 * v_offset + new_page_image.height)
+            location=(-h_offset, v_offset + new_page_image.height)
         )
 
         self._window["-CURRENT-PAGE-"].update(self._pdf.page_description)
