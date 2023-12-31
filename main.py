@@ -1,7 +1,7 @@
 import ctypes
 import pathlib as pl
 import platform
-from typing import Dict, Callable, Any, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import PySimpleGUI as sg
 from PIL import Image
@@ -15,7 +15,7 @@ SIGNATURES_FOLDER = pl.Path("signatures")
 
 
 class FalsiSignPy:
-    def __init__(self):
+    def __init__(self) -> None:
         self._running = False
         self._scanner: Optional[Scanner] = None
         self._current_page_figure_id = None
@@ -30,11 +30,12 @@ class FalsiSignPy:
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
     def create_window(self) -> sg.Window:
-        sg.theme("Dark Grey 13")
-
         col_left = [
             [sg.T("Select input pdf file:")],
-            [sg.Input(readonly=True, key="-INPUT-", enable_events=True), sg.FileBrowse(file_types=[("PDF", "*.pdf")])],
+            [
+                sg.Input(readonly=True, key="-INPUT-", enable_events=True),
+                sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
+            ],
             [sg.HSeparator()],
             [sg.Text("Scanner effects:")],
             [sg.Checkbox("Random blur"), sg.Slider((0, 1), resolution=0.01, orientation="horizontal")],
@@ -88,13 +89,14 @@ class FalsiSignPy:
         return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
 
     @staticmethod
-    def load_signatures_or_fail(path: pl.Path):
+    def load_signatures_or_fail(path: pl.Path) -> Dict[str, Image.Image]:
         signatures = {}
         for file in path.glob("*"):
             signatures[file.name] = Image.open(file)
         if len(signatures) == 0:
             sg.popup_error(
-                f"No signatures found. Place some signatures inside of the '{SIGNATURES_FOLDER}' folder and restart FalsiSignPy.",
+                f"No signatures found. Place some signatures inside of "
+                f"the '{SIGNATURES_FOLDER}' folder and restart FalsiSignPy.",
                 title="No signatures found",
             )
             exit(1)
@@ -115,8 +117,6 @@ class FalsiSignPy:
         self._floating_signature_figure_id = placed_figure
 
     def update_page(self, page_image: Image.Image) -> None:
-        print("dsfsa")
-
         new_page_image = self._scanner.apply(page_image)
 
         # Match document coordinate system
@@ -149,11 +149,11 @@ class FalsiSignPy:
         cursor_position = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_position)
 
-    def on_graph_leave(self, _: Dict[str, Any]):
+    def on_graph_leave(self, _: Dict[str, Any]) -> None:
         if self._floating_signature_figure_id is not None:
             self._graph.delete_figure(self._floating_signature_figure_id)
 
-    def on_graph_mouse_wheel(self, values: Dict[str, Any]):
+    def on_graph_mouse_wheel(self, values: Dict[str, Any]) -> None:
         if not values["-PLACE-"]:
             return
 
@@ -163,17 +163,17 @@ class FalsiSignPy:
         cursor_position = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_position)
 
-    def on_signature_selected(self, values: Dict[str, Any]):
+    def on_signature_selected(self, values: Dict[str, Any]) -> None:
         self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
         self._scanner.set_mode(ScannerMode.EDIT)
 
-    def on_remove_selected(self, _: Dict[str, Any]):
+    def on_remove_selected(self, _: Dict[str, Any]) -> None:
         self._scanner.set_mode(ScannerMode.EDIT)
 
-    def on_preview_selected(self, _: Dict[str, Any]):
+    def on_preview_selected(self, _: Dict[str, Any]) -> None:
         self._scanner.set_mode(ScannerMode.PREVIEW)
 
-    def on_graph_clicked(self, values: Dict[str, Any]):
+    def on_graph_clicked(self, values: Dict[str, Any]) -> None:
         cursor_position = values["-GRAPH-"]
         if values["-REMOVE-"]:
             figure_ids_at_location = self._graph.get_figures_at_location(cursor_position)
@@ -195,12 +195,12 @@ class FalsiSignPy:
             self._floating_signature_figure_id = None
 
     @staticmethod
-    def on_save_clicked(_: Dict[str, Any]):
+    def on_save_clicked(_: Dict[str, Any]) -> None:
         filename = sg.popup_get_file("Save pdf...", save_as=True)
         if filename is not None:
             pass
 
-    def _redraw_page_signatures(self):
+    def _redraw_page_signatures(self) -> None:
         page_signatures = self._pdf.get_current_page_signatures()
         self._pdf.clear_current_page_signatures()
         for signature in page_signatures:
@@ -216,21 +216,24 @@ class FalsiSignPy:
             signature_id = self._graph.draw_image(data=scaled_signature_bytes, location=graph_location)
             self._pdf.place_signature(signature=signature, identifier=signature_id)
 
-    def on_previous_page_clicked(self, _: Dict[str, Any]):
+    def on_previous_page_clicked(self, _: Dict[str, Any]) -> None:
         previous_page = self._pdf.select_and_get_previous_page_image()
         self.update_page(previous_page)
 
-    def on_next_page_clicked(self, _: Dict[str, Any]):
+    def on_next_page_clicked(self, _: Dict[str, Any]) -> None:
         next_page = self._pdf.select_and_get_next_page_image()
         self.update_page(next_page)
 
-    def on_input_file_selected(self, values: Dict[str, Any]):
+    def on_input_file_selected(self, values: Dict[str, Any]) -> None:
+        input_file = values["-INPUT-"]
+        if not input_file:
+            return
         filename = pl.Path(values["-INPUT-"])
         self._pdf = PDF(filename)
         current_page = self._pdf.get_current_page_image()
         self.update_page(current_page)
 
-    def on_window_resized(self, _: Dict[str, Any]):
+    def on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
             current_page = self._pdf.get_current_page_image()
             self.update_page(current_page)
@@ -238,7 +241,7 @@ class FalsiSignPy:
     def on_win_closed(self, _: Dict[str, Any]) -> None:
         self._running = False
 
-    def start(self):
+    def start(self) -> None:
         self._running = True
         self._scanner = Scanner()
         self._loaded_signatures = self.load_signatures_or_fail(SIGNATURES_FOLDER)

@@ -1,6 +1,7 @@
-import utils
 import pytest
 from PIL import Image
+
+import utils
 
 
 @pytest.mark.parametrize(

@@ -1,13 +1,13 @@
 import abc
 from collections.abc import Mapping
 from enum import Enum
-from typing import Dict
+from typing import Dict, Iterable, Tuple
 
 from PIL import Image, ImageOps
 
 
 class Filter(abc.ABC):
-    def __init__(self):
+    def __init__(self) -> None:
         self._enabled = True
 
     @property
@@ -34,14 +34,14 @@ class FilterCollection(Mapping):
     def __init__(self) -> None:
         self._filters: Dict[str, Filter] = {}
 
-    def __getitem__(self, key) -> Filter:
+    def __getitem__(self, key: str) -> Filter:
         return self._filters[key]
 
     def __len__(self) -> int:
         return len(self._filters)
 
-    def __iter__(self):
-        return iter(self._filters)
+    def __iter__(self) -> Iterable[Tuple[str, Filter]]:
+        return self._filters.items()
 
     def add(self, name: str, filter_: Filter) -> None:
         self._filters[name] = filter_
@@ -58,7 +58,7 @@ class ScannerMode(Enum):
 
 
 class Scanner:
-    def __init__(self):
+    def __init__(self) -> None:
         self._mode: ScannerMode = ScannerMode.EDIT
         self._filters = FilterCollection()
 

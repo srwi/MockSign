@@ -12,9 +12,11 @@ opencv-python = "4.8.1.78"
 Pillow = "9.3.0"
 PyMuPDF = "1.21.0"
 PySimpleGUI = "4.60.4"
-pytest = "7.4.3"
-ruff = "0.1.9"
 
+[tool.poetry.group.dev.dependencies]
+ruff = "0.1.9"
+mypy = "1.7.1"
+pytest = "7.4.3"
 
 [build-system]
 requires = ["poetry-core"]
@@ -33,8 +35,11 @@ indent-width = 4
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
-ignore = []
+select = ["ANN", "E", "F", "I"]
+ignore = [
+    "ANN101",  # self should not be annotated.
+    "ANN102"  # cls should not be annotated.
+]
 fixable = ["ALL"]
 unfixable = []
 

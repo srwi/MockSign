@@ -1,5 +1,5 @@
 import pathlib as pl
-from typing import List, Dict
+from typing import Dict, List
 
 import fitz
 from PIL import Image

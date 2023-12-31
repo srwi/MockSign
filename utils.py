@@ -31,7 +31,7 @@ def graph_to_page_coordinates(
     graph_coordinates: Tuple[int, int],
     graph_size: Tuple[int, int],
     page_size: Tuple[int, int],
-):
+) -> Tuple[float, float]:
     left_offset, top_offset, width, height, _ = calculate_padded_image_coordinates(
         image_size=page_size, target_size=graph_size
     )
@@ -45,7 +45,7 @@ def page_to_graph_coordinates(
     page_coordinates: Tuple[int, int],
     graph_size: Tuple[int, int],
     page_size: Tuple[int, int],
-):
+) -> Tuple[float, float]:
     left_offset, top_offset, width, height, _ = calculate_padded_image_coordinates(
         image_size=page_size, target_size=graph_size
     )
