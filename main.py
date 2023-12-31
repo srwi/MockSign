@@ -24,6 +24,7 @@ class FalsiSignPy:
         self._selected_signature_image = None
         self._loaded_signatures = None
         self._signature_zoom_level = 1.
+        self._scaling_factor = 1.
         self._window: Optional[sg.Window] = None
         self._graph: Optional[sg.Graph] = None
         self._pdf: Optional[PDF] = None
@@ -87,28 +88,28 @@ class FalsiSignPy:
         return signatures
 
     def _place_floating_signature(self, signature_image: Image.Image, cursor_position: Tuple[int, int]) -> None:
-        new_size = (int(signature_image.width * self._signature_zoom_level),
-                    int(signature_image.height * self._signature_zoom_level))
+        new_size = (int(signature_image.width * self._signature_zoom_level / self._scaling_factor),
+                    int(signature_image.height * self._signature_zoom_level / self._scaling_factor))
         scaled_signature_image = signature_image.copy().resize(new_size)
         scaled_signature_bytes = utils.image_to_bytes(scaled_signature_image)
-        signature_position = (cursor_position[0] - scaled_signature_image.width // 2,
-                              cursor_position[1] + scaled_signature_image.height // 2)
 
-        placed_figure: int = self._graph.draw_image(data=scaled_signature_bytes, location=signature_position)
+        placed_figure: int = self._graph.draw_image(data=scaled_signature_bytes, location=cursor_position)
         if self._floating_signature_figure_id is not None:
             self._graph.delete_figure(self._floating_signature_figure_id)
             self._floating_signature_figure_id = None
         self._floating_signature_figure_id = placed_figure
 
     def update_page(self, page_image: Image.Image) -> None:
+        print("dsfsa")
+
         new_page_image = self._scanner.apply(page_image)
 
         # Match document coordinate system
         graph_size = self._graph.get_size()
         self._graph.CanvasSize = graph_size  # https://github.com/PySimpleGUI/PySimpleGUI/issues/6451
-        _, _, _, _, scaling_factor = utils.calculate_padded_image_coordinates(new_page_image.size, graph_size)
-        h_offset = ((graph_size[0] * scaling_factor) - new_page_image.width) / 2
-        v_offset = ((graph_size[1] * scaling_factor) - new_page_image.height) / 2
+        _, _, _, _, self._scaling_factor = utils.calculate_padded_image_coordinates(new_page_image.size, graph_size)
+        h_offset = ((graph_size[0] * self._scaling_factor) - new_page_image.width) / 2
+        v_offset = ((graph_size[1] * self._scaling_factor) - new_page_image.height) / 2
         self._graph.change_coordinates(
             graph_bottom_left=(-h_offset, -v_offset),
             graph_top_right=(new_page_image.width + h_offset, new_page_image.height + v_offset)
@@ -190,11 +191,8 @@ class FalsiSignPy:
         self._pdf.clear_current_page_signatures()
         for signature in page_signatures:
             scaled_signature = signature.get_scaled_signature()
+            scaled_signature = scaled_signature.resize((int(scaled_signature.width / self._scaling_factor), int(scaled_signature.height / self._scaling_factor)))
             graph_location = signature.get_location()
-            graph_location = (
-                graph_location[0] - scaled_signature.width // 2,
-                graph_location[1] + scaled_signature.height // 2
-            )
             scaled_signature_bytes = utils.image_to_bytes(scaled_signature)
             signature_id = self._graph.draw_image(data=scaled_signature_bytes,
                                                   location=graph_location)
