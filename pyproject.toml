@@ -8,13 +8,37 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-opencv-python = "*"
+opencv-python = "4.8.1.78"
 Pillow = "9.3.0"
 PyMuPDF = "1.21.0"
 PySimpleGUI = "4.60.4"
-pytest = "7.4.0"
+pytest = "7.4.3"
+ruff = "0.1.9"
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+exclude = [
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".vscode",
+    ".idea",
+]
+line-length = 120
+indent-width = 4
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false

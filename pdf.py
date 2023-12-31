@@ -31,11 +31,7 @@ class PDF:
         if len(self._pages) == 0:
             raise RuntimeError("Can not save empty document.")
 
-        self._pages[0].save(path,
-                            "PDF",
-                            resolution=100.0,
-                            save_all=True,
-                            append_images=self._pages[1:])
+        self._pages[0].save(path, "PDF", resolution=100.0, save_all=True, append_images=self._pages[1:])
 
     def get_current_page_image(self) -> Image.Image:
         return self.get_page_image(self._current_page)

@@ -15,7 +15,6 @@ SIGNATURES_FOLDER = pl.Path("signatures")
 
 
 class FalsiSignPy:
-
     def __init__(self):
         self._running = False
         self._scanner: Optional[Scanner] = None
@@ -23,15 +22,15 @@ class FalsiSignPy:
         self._floating_signature_figure_id: Optional[int] = None
         self._selected_signature_image = None
         self._loaded_signatures = None
-        self._signature_zoom_level = 1.
-        self._scaling_factor = 1.
+        self._signature_zoom_level = 1.0
+        self._scaling_factor = 1.0
         self._window: Optional[sg.Window] = None
         self._graph: Optional[sg.Graph] = None
         self._pdf: Optional[PDF] = None
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
     def create_window(self) -> sg.Window:
-        sg.theme('Dark Grey 13')
+        sg.theme("Dark Grey 13")
 
         col_left = [
             [sg.T("Select input pdf file:")],
@@ -44,7 +43,15 @@ class FalsiSignPy:
             [sg.Checkbox("Grayscale")],
             [sg.HSeparator()],
             [sg.Text("Place signature:")],
-            [sg.Combo(list(self._loaded_signatures.keys()), default_value=list(self._loaded_signatures.keys())[0], key="-DROPDOWN-", enable_events=True, readonly=True)],
+            [
+                sg.Combo(
+                    list(self._loaded_signatures.keys()),
+                    default_value=list(self._loaded_signatures.keys())[0],
+                    key="-DROPDOWN-",
+                    enable_events=True,
+                    readonly=True,
+                )
+            ],
             [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
             [sg.Radio("Remove", key="-REMOVE-", group_id=0)],
             [sg.HSeparator()],
@@ -53,7 +60,11 @@ class FalsiSignPy:
 
         col_right = [
             [sg.Button("Save pdf...", key="-SAVE-")],
-            [sg.Button("<", key="-PREVIOUS-"), sg.Text("No file loaded", key="-CURRENT-PAGE-"), sg.Button(">", key="-NEXT-")],
+            [
+                sg.Button("<", key="-PREVIOUS-"),
+                sg.Text("No file loaded", key="-CURRENT-PAGE-"),
+                sg.Button(">", key="-NEXT-"),
+            ],
             [
                 sg.Graph(
                     canvas_size=(400, 400),
@@ -71,7 +82,7 @@ class FalsiSignPy:
 
         layout = [
             [sg.Col(col_left), sg.Col(col_right, expand_y=True, expand_x=True)],
-            [sg.Text(key="-INFO-", size=(60, 1))]
+            [sg.Text(key="-INFO-", size=(60, 1))],
         ]
 
         return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
@@ -82,14 +93,18 @@ class FalsiSignPy:
         for file in path.glob("*"):
             signatures[file.name] = Image.open(file)
         if len(signatures) == 0:
-            sg.popup_error(f"No signatures found. Place some signatures inside of the '{SIGNATURES_FOLDER}' folder and restart FalsiSignPy.",
-                           title="No signatures found")
+            sg.popup_error(
+                f"No signatures found. Place some signatures inside of the '{SIGNATURES_FOLDER}' folder and restart FalsiSignPy.",
+                title="No signatures found",
+            )
             exit(1)
         return signatures
 
     def _place_floating_signature(self, signature_image: Image.Image, cursor_position: Tuple[int, int]) -> None:
-        new_size = (int(signature_image.width * self._signature_zoom_level / self._scaling_factor),
-                    int(signature_image.height * self._signature_zoom_level / self._scaling_factor))
+        new_size = (
+            int(signature_image.width * self._signature_zoom_level / self._scaling_factor),
+            int(signature_image.height * self._signature_zoom_level / self._scaling_factor),
+        )
         scaled_signature_image = signature_image.copy().resize(new_size)
         scaled_signature_bytes = utils.image_to_bytes(scaled_signature_image)
 
@@ -112,7 +127,7 @@ class FalsiSignPy:
         v_offset = ((graph_size[1] * self._scaling_factor) - new_page_image.height) / 2
         self._graph.change_coordinates(
             graph_bottom_left=(-h_offset, -v_offset),
-            graph_top_right=(new_page_image.width + h_offset, new_page_image.height + v_offset)
+            graph_top_right=(new_page_image.width + h_offset, new_page_image.height + v_offset),
         )
 
         # Update page figure
@@ -120,8 +135,7 @@ class FalsiSignPy:
         if self._current_page_figure_id is not None:
             self._graph.delete_figure(self._current_page_figure_id)
         self._current_page_figure_id = self._graph.draw_image(
-            data=utils.image_to_bytes(new_page_image_resized),
-            location=(-h_offset, v_offset + new_page_image.height)
+            data=utils.image_to_bytes(new_page_image_resized), location=(-h_offset, v_offset + new_page_image.height)
         )
 
         self._window["-CURRENT-PAGE-"].update(self._pdf.page_description)
@@ -173,9 +187,9 @@ class FalsiSignPy:
             if not self._pdf:
                 print("Please load a PDF file before placing signatures.")
                 return
-            placed_signature = Signature(image=self._selected_signature_image,
-                                         location=cursor_position,
-                                         scale=self._signature_zoom_level)
+            placed_signature = Signature(
+                image=self._selected_signature_image, location=cursor_position, scale=self._signature_zoom_level
+            )
             self._pdf.place_signature(placed_signature, self._floating_signature_figure_id)
             # Anchor floating signature
             self._floating_signature_figure_id = None
@@ -191,11 +205,15 @@ class FalsiSignPy:
         self._pdf.clear_current_page_signatures()
         for signature in page_signatures:
             scaled_signature = signature.get_scaled_signature()
-            scaled_signature = scaled_signature.resize((int(scaled_signature.width / self._scaling_factor), int(scaled_signature.height / self._scaling_factor)))
+            scaled_signature = scaled_signature.resize(
+                (
+                    int(scaled_signature.width / self._scaling_factor),
+                    int(scaled_signature.height / self._scaling_factor),
+                )
+            )
             graph_location = signature.get_location()
             scaled_signature_bytes = utils.image_to_bytes(scaled_signature)
-            signature_id = self._graph.draw_image(data=scaled_signature_bytes,
-                                                  location=graph_location)
+            signature_id = self._graph.draw_image(data=scaled_signature_bytes, location=graph_location)
             self._pdf.place_signature(signature=signature, identifier=signature_id)
 
     def on_previous_page_clicked(self, _: Dict[str, Any]):

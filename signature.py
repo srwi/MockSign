@@ -6,10 +6,12 @@ import utils
 
 
 class Signature:
-    def __init__(self,
-                 image: Image.Image,
-                 location: Tuple[int, int],
-                 scale: float,) -> None:
+    def __init__(
+        self,
+        image: Image.Image,
+        location: Tuple[int, int],
+        scale: float,
+    ) -> None:
         self._image = image
         self._location = location
         self._scale = scale
