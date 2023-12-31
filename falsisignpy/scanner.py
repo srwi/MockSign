@@ -69,7 +69,7 @@ class Scanner:
 
     def apply(self, page: Image.Image) -> Image.Image:
         if self._mode == ScannerMode.PREVIEW:
-            for filter_ in self._filters:
+            for _, filter_ in self._filters:
                 page = filter_.apply(page)
 
         return page

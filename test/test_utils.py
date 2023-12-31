@@ -1,7 +1,7 @@
 import pytest
 from PIL import Image
 
-import utils
+from src import utils
 
 
 @pytest.mark.parametrize(

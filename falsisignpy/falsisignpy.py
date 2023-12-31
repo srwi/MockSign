@@ -4,14 +4,13 @@ import platform
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import PySimpleGUI as sg
-from PIL import Image
-
 import utils
 from pdf import PDF
+from PIL import Image
 from scanner import Scanner, ScannerMode
 from signature import Signature
 
-SIGNATURES_FOLDER = pl.Path("signatures")
+SIGNATURES_FOLDER = pl.Path(__file__).parent / "signatures"
 
 
 class FalsiSignPy:
