@@ -3,14 +3,12 @@ from typing import Dict, List
 
 import fitz
 from PIL import Image
-
 from signature import Signature
 
 
 class PDF:
     def __init__(self, path: pl.Path) -> None:
-        self._current_page: int = 0
-        self._pages = []
+        self._pages: List[Image] = []
 
         document = fitz.Document(path)
         for i in range(document.page_count):
@@ -21,11 +19,23 @@ class PDF:
 
         self._signatures: List[Dict[int, Signature]] = [{} for _ in self._pages]
 
-    def place_signature(self, signature: Signature, identifier: int) -> None:
-        self._signatures[self._current_page][identifier] = signature
+    def place_signature(self, page_number: int, signature: Signature, identifier: int) -> None:
+        if page_number >= len(self._pages):
+            raise RuntimeError(f"Page {page_number} does not exist.")
+
+        for i, page_signatures in enumerate(self._signatures):
+            if identifier in page_signatures:
+                raise RuntimeError(f"Signature with identifier {identifier} already exists on page {i}.")
+
+        self._signatures[page_number][identifier] = signature
 
     def delete_signature(self, identifier: int) -> None:
-        del self._signatures[self._current_page][identifier]
+        for i, page_signatures in enumerate(self._signatures):
+            if identifier in page_signatures:
+                del self._signatures[i][identifier]
+                return
+
+        raise RuntimeError(f"Signature with identifier {identifier} does not exist.")
 
     def save(self, path: pl.Path) -> None:
         if len(self._pages) == 0:
@@ -33,52 +43,27 @@ class PDF:
 
         self._pages[0].save(path, "PDF", resolution=100.0, save_all=True, append_images=self._pages[1:])
 
-    def get_current_page_image(self) -> Image.Image:
-        return self.get_page_image(self._current_page)
-
     def get_page_image(self, page_number: int) -> Image.Image:
-        if not self.loaded:
-            raise RuntimeError("No pdf loaded.")
+        if page_number >= len(self._pages):
+            raise RuntimeError(f"Page {page_number} does not exist.")
 
         return self._pages[page_number]
 
     def get_page_signatures(self, page_number: int) -> List[Signature]:
         return list(self._signatures[page_number].values())
 
-    def get_current_page_signatures(self) -> List[Signature]:
-        return self.get_page_signatures(self._current_page)
-
     def get_page_signature_ids(self, page_number: int) -> List[int]:
         return list(self._signatures[page_number].keys())
 
-    def get_current_page_signature_ids(self) -> List[int]:
-        return self.get_page_signature_ids(self._current_page)
+    def clear_page_signatures(self, page_number: int) -> None:
+        if page_number >= len(self._pages):
+            raise RuntimeError(f"Page {page_number} does not exist.")
 
-    def clear_current_page_signatures(self) -> None:
-        self._signatures[self._current_page] = {}
-
-    def select_and_get_next_page_image(self) -> Image.Image:
-        self._current_page = min(self._current_page + 1, self.num_pages - 1)
-        return self.get_current_page_image()
-
-    def select_and_get_previous_page_image(self) -> Image.Image:
-        self._current_page = max(self._current_page - 1, 0)
-        return self.get_current_page_image()
-
-    @property
-    def page_description(self) -> str:
-        if not self.loaded:
-            return ""
-
-        return f"Page {self._current_page + 1} / {self.num_pages}"
+        self._signatures[page_number] = {}
 
     @property
     def num_pages(self) -> int:
         return len(self._pages)
-
-    @property
-    def current_page(self) -> int:
-        return self._current_page
 
     @property
     def loaded(self) -> bool:

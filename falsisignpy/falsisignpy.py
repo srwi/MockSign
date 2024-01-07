@@ -17,7 +17,8 @@ class FalsiSignPy:
     def __init__(self) -> None:
         self._running = False
         self._scanner: Optional[Scanner] = None
-        self._current_page_figure_id = None
+        self._current_page_figure_id: Optional[int] = None
+        self._current_page: int = 0
         self._floating_signature_figure_id: Optional[int] = None
         self._selected_signature_image = None
         self._loaded_signatures = None
@@ -115,6 +116,9 @@ class FalsiSignPy:
             self._floating_signature_figure_id = None
         self._floating_signature_figure_id = placed_figure
 
+    def _describe_page(self, page_number: int) -> str:
+        return f"Page {page_number + 1}/{self._pdf.num_pages}"
+
     def _update_page(self, page_image: Image.Image) -> None:
         new_page_image = self._scanner.apply(page_image)
 
@@ -137,7 +141,7 @@ class FalsiSignPy:
             data=utils.image_to_bytes(new_page_image_resized), location=(-h_offset, v_offset + new_page_image.height)
         )
 
-        self._window["-CURRENT-PAGE-"].update(self._pdf.page_description)
+        self._window["-CURRENT-PAGE-"].update(self._describe_page(self._current_page))
 
         self._redraw_page_signatures()
 
@@ -189,9 +193,15 @@ class FalsiSignPy:
             if self._floating_signature_figure_id is None:
                 return
             placed_signature = Signature(
-                image=self._selected_signature_image, location=cursor_position, scale=self._signature_zoom_level
+                image=self._selected_signature_image,
+                location=cursor_position,
+                scale=self._signature_zoom_level,
             )
-            self._pdf.place_signature(placed_signature, self._floating_signature_figure_id)
+            self._pdf.place_signature(
+                signature=placed_signature,
+                identifier=self._floating_signature_figure_id,
+                page_number=self._current_page,
+            )
             self._floating_signature_figure_id = None  # Anchor floating signature
 
     @staticmethod
@@ -201,8 +211,8 @@ class FalsiSignPy:
             pass
 
     def _redraw_page_signatures(self) -> None:
-        page_signatures = self._pdf.get_current_page_signatures()
-        self._pdf.clear_current_page_signatures()
+        page_signatures = self._pdf.get_page_signatures(self._current_page)
+        self._pdf.clear_page_signatures(self._current_page)
         for signature in page_signatures:
             scaled_signature = signature.get_scaled_signature()
             scaled_signature = scaled_signature.resize(
@@ -214,19 +224,28 @@ class FalsiSignPy:
             graph_location = signature.get_location()
             scaled_signature_bytes = utils.image_to_bytes(scaled_signature)
             signature_id = self._graph.draw_image(data=scaled_signature_bytes, location=graph_location)
-            self._pdf.place_signature(signature=signature, identifier=signature_id)
+            self._pdf.place_signature(
+                signature=signature,
+                identifier=signature_id,
+                page_number=self._current_page,
+            )
+
+    def _navigate_page(self, delta: int) -> None:
+        new_page_number = self._current_page + delta
+        if new_page_number < 0 or new_page_number >= self._pdf.num_pages:
+            return
+
+        for id_ in self._pdf.get_page_signature_ids(self._current_page):
+            self._graph.delete_figure(id_)
+        self._current_page = new_page_number
+        new_page_image = self._pdf.get_page_image(self._current_page)
+        self._update_page(new_page_image)  # TODO: it's not immediately clear that this restores signatures
 
     def on_previous_page_clicked(self, _: Dict[str, Any]) -> None:
-        for id_ in self._pdf.get_current_page_signature_ids():
-            self._graph.delete_figure(id_)
-        previous_page = self._pdf.select_and_get_previous_page_image()
-        self._update_page(previous_page)
+        self._navigate_page(-1)
 
     def on_next_page_clicked(self, _: Dict[str, Any]) -> None:
-        for id_ in self._pdf.get_current_page_signature_ids():
-            self._graph.delete_figure(id_)
-        next_page = self._pdf.select_and_get_next_page_image()
-        self._update_page(next_page)
+        self._navigate_page(1)
 
     def on_input_file_selected(self, values: Dict[str, Any]) -> None:
         input_file = values["-INPUT-"]
@@ -234,12 +253,12 @@ class FalsiSignPy:
             return
         filename = pl.Path(values["-INPUT-"])
         self._pdf = PDF(filename)
-        current_page = self._pdf.get_current_page_image()
+        current_page = self._pdf.get_page_image(self._current_page)
         self._update_page(current_page)
 
     def on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
-            current_page = self._pdf.get_current_page_image()
+            current_page = self._pdf.get_page_image(self._current_page)
             self._update_page(current_page)
 
     def on_win_closed(self, _: Dict[str, Any]) -> None:
