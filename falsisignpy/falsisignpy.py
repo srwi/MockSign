@@ -29,7 +29,7 @@ class FalsiSignPy:
         self._pdf: Optional[PDF] = None
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
-    def create_window(self) -> sg.Window:
+    def _create_window(self) -> sg.Window:
         col_left = [
             [sg.T("Select input pdf file:")],
             [
@@ -89,7 +89,7 @@ class FalsiSignPy:
         return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
 
     @staticmethod
-    def load_signatures_or_fail(path: pl.Path) -> Dict[str, Image.Image]:
+    def _load_signatures_or_fail(path: pl.Path) -> Dict[str, Image.Image]:
         signatures = {}
         for file in path.glob("*"):
             signatures[file.name] = Image.open(file)
@@ -145,18 +145,18 @@ class FalsiSignPy:
 
         self._redraw_page_signatures()
 
-    def on_graph_move(self, values: Dict[str, Any]) -> None:
+    def _on_graph_move(self, values: Dict[str, Any]) -> None:
         if not values["-PLACE-"]:
             return
 
         cursor_position = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_position)
 
-    def on_graph_leave(self, _: Dict[str, Any]) -> None:
+    def _on_graph_leave(self, _: Dict[str, Any]) -> None:
         if self._floating_signature_figure_id is not None:
             self._graph.delete_figure(self._floating_signature_figure_id)
 
-    def on_graph_mouse_wheel(self, values: Dict[str, Any]) -> None:
+    def _on_graph_mouse_wheel(self, values: Dict[str, Any]) -> None:
         if not values["-PLACE-"]:
             return
 
@@ -166,17 +166,17 @@ class FalsiSignPy:
         cursor_position = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_position)
 
-    def on_signature_selected(self, values: Dict[str, Any]) -> None:
+    def _on_signature_selected(self, values: Dict[str, Any]) -> None:
         self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
         self._scanner.set_mode(ScannerMode.EDIT)
 
-    def on_remove_selected(self, _: Dict[str, Any]) -> None:
+    def _on_remove_selected(self, _: Dict[str, Any]) -> None:
         self._scanner.set_mode(ScannerMode.EDIT)
 
-    def on_preview_selected(self, _: Dict[str, Any]) -> None:
+    def _on_preview_selected(self, _: Dict[str, Any]) -> None:
         self._scanner.set_mode(ScannerMode.PREVIEW)
 
-    def on_graph_clicked(self, values: Dict[str, Any]) -> None:
+    def _on_graph_clicked(self, values: Dict[str, Any]) -> None:
         cursor_position = values["-GRAPH-"]
         if values["-REMOVE-"]:
             figure_ids_at_location = self._graph.get_figures_at_location(cursor_position)
@@ -205,7 +205,7 @@ class FalsiSignPy:
             self._floating_signature_figure_id = None  # Anchor floating signature
 
     @staticmethod
-    def on_save_clicked(_: Dict[str, Any]) -> None:
+    def _on_save_clicked(_: Dict[str, Any]) -> None:
         filename = sg.popup_get_file("Save pdf...", save_as=True)
         if filename is not None:
             pass
@@ -239,57 +239,57 @@ class FalsiSignPy:
             self._graph.delete_figure(id_)
         self._current_page = new_page_number
         new_page_image = self._pdf.get_page_image(self._current_page)
-        self._update_page(new_page_image)  # TODO: it's not immediately clear that this restores signatures
+        self._update_page(new_page_image)
 
-    def on_previous_page_clicked(self, _: Dict[str, Any]) -> None:
+    def _on_previous_page_clicked(self, _: Dict[str, Any]) -> None:
         self._navigate_page(-1)
 
-    def on_next_page_clicked(self, _: Dict[str, Any]) -> None:
+    def _on_next_page_clicked(self, _: Dict[str, Any]) -> None:
         self._navigate_page(1)
 
-    def on_input_file_selected(self, values: Dict[str, Any]) -> None:
+    def _on_input_file_selected(self, values: Dict[str, Any]) -> None:
         input_file = values["-INPUT-"]
         if not input_file:
             return
-        filename = pl.Path(values["-INPUT-"])
+        filename = pl.Path(input_file)
         self._pdf = PDF(filename)
         current_page = self._pdf.get_page_image(self._current_page)
         self._update_page(current_page)
 
-    def on_window_resized(self, _: Dict[str, Any]) -> None:
+    def _on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
             current_page = self._pdf.get_page_image(self._current_page)
             self._update_page(current_page)
 
-    def on_win_closed(self, _: Dict[str, Any]) -> None:
+    def _on_win_closed(self, _: Dict[str, Any]) -> None:
         self._running = False
 
     def start(self) -> None:
         self._running = True
         self._scanner = Scanner()
-        self._loaded_signatures = self.load_signatures_or_fail(SIGNATURES_FOLDER)
+        self._loaded_signatures = self._load_signatures_or_fail(SIGNATURES_FOLDER)
 
-        self._window: sg.Window = self.create_window()
+        self._window: sg.Window = self._create_window()
         self._window.bind("<Configure>", "-CONFIGURE-")
 
         self._graph: sg.Graph = self._window["-GRAPH-"]
         self._graph.bind("<Leave>", "+LEAVE")
         self._graph.bind("<MouseWheel>", "+WHEEL")
 
-        self._event_handlers[sg.WIN_CLOSED] = self.on_win_closed
-        self._event_handlers["-GRAPH-+MOVE"] = self.on_graph_move
-        self._event_handlers["-GRAPH-+LEAVE"] = self.on_graph_leave
-        self._event_handlers["-GRAPH-+WHEEL"] = self.on_graph_mouse_wheel
-        self._event_handlers["-GRAPH-"] = self.on_graph_clicked
-        self._event_handlers["-DROPDOWN-"] = self.on_signature_selected
-        self._event_handlers["-PLACE-"] = self.on_signature_selected
-        self._event_handlers["-REMOVE-"] = self.on_remove_selected
-        self._event_handlers["-PREVIEW-"] = self.on_preview_selected
-        self._event_handlers["-SAVE-"] = self.on_save_clicked
-        self._event_handlers["-PREVIOUS-"] = self.on_previous_page_clicked
-        self._event_handlers["-NEXT-"] = self.on_next_page_clicked
-        self._event_handlers["-INPUT-"] = self.on_input_file_selected
-        self._event_handlers["-CONFIGURE-"] = self.on_window_resized
+        self._event_handlers[sg.WIN_CLOSED] = self._on_win_closed
+        self._event_handlers["-GRAPH-+MOVE"] = self._on_graph_move
+        self._event_handlers["-GRAPH-+LEAVE"] = self._on_graph_leave
+        self._event_handlers["-GRAPH-+WHEEL"] = self._on_graph_mouse_wheel
+        self._event_handlers["-GRAPH-"] = self._on_graph_clicked
+        self._event_handlers["-DROPDOWN-"] = self._on_signature_selected
+        self._event_handlers["-PLACE-"] = self._on_signature_selected
+        self._event_handlers["-REMOVE-"] = self._on_remove_selected
+        self._event_handlers["-PREVIEW-"] = self._on_preview_selected
+        self._event_handlers["-SAVE-"] = self._on_save_clicked
+        self._event_handlers["-PREVIOUS-"] = self._on_previous_page_clicked
+        self._event_handlers["-NEXT-"] = self._on_next_page_clicked
+        self._event_handlers["-INPUT-"] = self._on_input_file_selected
+        self._event_handlers["-CONFIGURE-"] = self._on_window_resized
 
         while self._running:
             event, values = self._window.read()

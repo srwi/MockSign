@@ -37,18 +37,6 @@ class PDF:
 
         raise RuntimeError(f"Signature with identifier {identifier} does not exist.")
 
-    def save(self, path: pl.Path) -> None:
-        if len(self._pages) == 0:
-            raise RuntimeError("Can not save empty document.")
-
-        self._pages[0].save(path, "PDF", resolution=100.0, save_all=True, append_images=self._pages[1:])
-
-    def get_page_image(self, page_number: int) -> Image.Image:
-        if page_number >= len(self._pages):
-            raise RuntimeError(f"Page {page_number} does not exist.")
-
-        return self._pages[page_number]
-
     def get_page_signatures(self, page_number: int) -> List[Signature]:
         return list(self._signatures[page_number].values())
 
@@ -60,6 +48,18 @@ class PDF:
             raise RuntimeError(f"Page {page_number} does not exist.")
 
         self._signatures[page_number] = {}
+
+    def save(self, path: pl.Path) -> None:
+        if len(self._pages) == 0:
+            raise RuntimeError("Can not save empty document.")
+
+        self._pages[0].save(path, "PDF", resolution=100.0, save_all=True, append_images=self._pages[1:])
+
+    def get_page_image(self, page_number: int) -> Image.Image:
+        if page_number >= len(self._pages):
+            raise RuntimeError(f"Page {page_number} does not exist.")
+
+        return self._pages[page_number]
 
     @property
     def num_pages(self) -> int:
