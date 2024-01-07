@@ -48,6 +48,12 @@ class PDF:
     def get_current_page_signatures(self) -> List[Signature]:
         return self.get_page_signatures(self._current_page)
 
+    def get_page_signature_ids(self, page_number: int) -> List[int]:
+        return list(self._signatures[page_number].keys())
+
+    def get_current_page_signature_ids(self) -> List[int]:
+        return self.get_page_signature_ids(self._current_page)
+
     def clear_current_page_signatures(self) -> None:
         self._signatures[self._current_page] = {}
 

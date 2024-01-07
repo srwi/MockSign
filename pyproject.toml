@@ -8,7 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-opencv-python = "4.8.1.78"
+opencv-python = "4.9.0.80"
 Pillow = "9.3.0"
 PyMuPDF = "1.21.0"
 PySimpleGUI = "4.60.4"

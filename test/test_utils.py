@@ -1,7 +1,7 @@
 import pytest
 from PIL import Image
 
-from src import utils
+from falsisignpy import utils
 
 
 @pytest.mark.parametrize(

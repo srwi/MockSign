@@ -115,7 +115,7 @@ class FalsiSignPy:
             self._floating_signature_figure_id = None
         self._floating_signature_figure_id = placed_figure
 
-    def update_page(self, page_image: Image.Image) -> None:
+    def _update_page(self, page_image: Image.Image) -> None:
         new_page_image = self._scanner.apply(page_image)
 
         # Match document coordinate system
@@ -186,12 +186,13 @@ class FalsiSignPy:
             if not self._pdf:
                 print("Please load a PDF file before placing signatures.")
                 return
+            if self._floating_signature_figure_id is None:
+                return
             placed_signature = Signature(
                 image=self._selected_signature_image, location=cursor_position, scale=self._signature_zoom_level
             )
             self._pdf.place_signature(placed_signature, self._floating_signature_figure_id)
-            # Anchor floating signature
-            self._floating_signature_figure_id = None
+            self._floating_signature_figure_id = None  # Anchor floating signature
 
     @staticmethod
     def on_save_clicked(_: Dict[str, Any]) -> None:
@@ -216,12 +217,16 @@ class FalsiSignPy:
             self._pdf.place_signature(signature=signature, identifier=signature_id)
 
     def on_previous_page_clicked(self, _: Dict[str, Any]) -> None:
+        for id_ in self._pdf.get_current_page_signature_ids():
+            self._graph.delete_figure(id_)
         previous_page = self._pdf.select_and_get_previous_page_image()
-        self.update_page(previous_page)
+        self._update_page(previous_page)
 
     def on_next_page_clicked(self, _: Dict[str, Any]) -> None:
+        for id_ in self._pdf.get_current_page_signature_ids():
+            self._graph.delete_figure(id_)
         next_page = self._pdf.select_and_get_next_page_image()
-        self.update_page(next_page)
+        self._update_page(next_page)
 
     def on_input_file_selected(self, values: Dict[str, Any]) -> None:
         input_file = values["-INPUT-"]
@@ -230,12 +235,12 @@ class FalsiSignPy:
         filename = pl.Path(values["-INPUT-"])
         self._pdf = PDF(filename)
         current_page = self._pdf.get_current_page_image()
-        self.update_page(current_page)
+        self._update_page(current_page)
 
     def on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
             current_page = self._pdf.get_current_page_image()
-            self.update_page(current_page)
+            self._update_page(current_page)
 
     def on_win_closed(self, _: Dict[str, Any]) -> None:
         self._running = False
