@@ -1,16 +1,22 @@
 import ctypes
 import pathlib as pl
 import platform
+from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import PySimpleGUI as sg
 import utils
 from pdf import PDF
 from PIL import Image
-from scanner import Scanner, ScannerMode
+from scanner import Scanner
 from signature import Signature
 
 SIGNATURES_FOLDER = pl.Path(__file__).parent / "signatures"
+
+
+class Mode(Enum):
+    EDIT = 1
+    PREVIEW = 2
 
 
 class FalsiSignPy:
@@ -27,6 +33,7 @@ class FalsiSignPy:
         self._window: Optional[sg.Window] = None
         self._graph: Optional[sg.Graph] = None
         self._pdf: Optional[PDF] = None
+        self._mode: Mode = Mode.PREVIEW
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
     def _create_window(self) -> sg.Window:
@@ -38,9 +45,18 @@ class FalsiSignPy:
             ],
             [sg.HSeparator()],
             [sg.Text("Scanner effects:")],
-            [sg.Checkbox("Random blur"), sg.Slider((0, 1), resolution=0.01, orientation="horizontal")],
-            [sg.Checkbox("Random rotate"), sg.Slider((0, 1), resolution=0.01, orientation="horizontal")],
-            [sg.Checkbox("Gamma"), sg.Slider((0, 1), resolution=0.01, orientation="horizontal")],
+            [
+                sg.Checkbox("Random blur"),
+                sg.Slider((0, 1), resolution=0.01, orientation="horizontal"),
+            ],
+            [
+                sg.Checkbox("Random rotate"),
+                sg.Slider((0, 1), resolution=0.01, orientation="horizontal"),
+            ],
+            [
+                sg.Checkbox("Gamma"),
+                sg.Slider((0, 1), resolution=0.01, orientation="horizontal"),
+            ],
             [sg.Checkbox("Grayscale")],
             [sg.HSeparator()],
             [sg.Text("Place signature:")],
@@ -54,9 +70,9 @@ class FalsiSignPy:
                 )
             ],
             [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
-            [sg.Radio("Remove", key="-REMOVE-", group_id=0)],
+            [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
             [sg.HSeparator()],
-            [sg.Radio("Preview", key="-PREVIEW-", group_id=0, default=True)],
+            [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True, default=True)],
         ]
 
         col_right = [
@@ -120,7 +136,10 @@ class FalsiSignPy:
         return f"Page {page_number + 1}/{self._pdf.num_pages}"
 
     def _update_page(self, page_image: Image.Image) -> None:
-        new_page_image = self._scanner.apply(page_image)
+        new_page_image = page_image.copy()
+        print("update page", self._mode)
+        if self._mode == Mode.PREVIEW:
+            new_page_image = self._scanner.apply(new_page_image)
 
         # Match document coordinate system
         graph_size = self._graph.get_size()
@@ -143,7 +162,15 @@ class FalsiSignPy:
 
         self._window["-CURRENT-PAGE-"].update(self._describe_page(self._current_page))
 
-        self._redraw_page_signatures()
+        if self._mode == Mode.EDIT:
+            self._redraw_page_signatures()
+
+    def _update_current_page(self) -> None:
+        if self._pdf is None or not self._pdf.loaded:
+            return
+
+        current_page_image = self._pdf.get_page_image(self._current_page)
+        self._update_page(current_page_image)
 
     def _on_graph_move(self, values: Dict[str, Any]) -> None:
         if not values["-PLACE-"]:
@@ -166,15 +193,19 @@ class FalsiSignPy:
         cursor_position = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_position)
 
+    def _set_mode(self, mode: Mode) -> None:
+        self._mode = mode
+        self._update_current_page()
+
     def _on_signature_selected(self, values: Dict[str, Any]) -> None:
         self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
-        self._scanner.set_mode(ScannerMode.EDIT)
+        self._set_mode(Mode.EDIT)
 
     def _on_remove_selected(self, _: Dict[str, Any]) -> None:
-        self._scanner.set_mode(ScannerMode.EDIT)
+        self._set_mode(Mode.EDIT)
 
     def _on_preview_selected(self, _: Dict[str, Any]) -> None:
-        self._scanner.set_mode(ScannerMode.PREVIEW)
+        self._set_mode(Mode.PREVIEW)
 
     def _on_graph_clicked(self, values: Dict[str, Any]) -> None:
         cursor_position = values["-GRAPH-"]

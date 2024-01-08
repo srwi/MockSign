@@ -1,14 +1,14 @@
 import abc
 from collections.abc import Mapping
-from enum import Enum
 from typing import Dict, Iterable, Tuple
 
 from PIL import Image, ImageOps
 
 
 class Filter(abc.ABC):
-    def __init__(self) -> None:
-        self._enabled = True
+    def __init__(self, enabled: bool, strength: float) -> None:
+        self._enabled = enabled
+        self._strength = strength
 
     @property
     def enabled(self) -> bool:
@@ -17,6 +17,14 @@ class Filter(abc.ABC):
     @enabled.setter
     def enabled(self, value: bool) -> None:
         self._enabled = value
+
+    @property
+    def strength(self) -> float:
+        return self._strength
+
+    @strength.setter
+    def strength(self, value: bool) -> None:
+        self._strength = value
 
     @abc.abstractmethod
     def _apply(self, image: Image.Image) -> Image.Image:
@@ -41,7 +49,7 @@ class FilterCollection(Mapping):
         return len(self._filters)
 
     def __iter__(self) -> Iterable[Tuple[str, Filter]]:
-        return self._filters.items()
+        return iter(self._filters.items())
 
     def add(self, name: str, filter_: Filter) -> None:
         self._filters[name] = filter_
@@ -52,24 +60,15 @@ class InvertFilter(Filter):
         return ImageOps.invert(image)
 
 
-class ScannerMode(Enum):
-    EDIT = 1
-    PREVIEW = 2
-
-
 class Scanner:
     def __init__(self) -> None:
-        self._mode: ScannerMode = ScannerMode.EDIT
         self._filters = FilterCollection()
 
-        self._filters.add("invert", InvertFilter())
-
-    def set_mode(self, mode: ScannerMode) -> None:
-        self._mode = mode
+        # TODO: Consider removing filter names
+        self._filters.add("invert", InvertFilter(enabled=True, strength=1.0))
 
     def apply(self, page: Image.Image) -> Image.Image:
-        if self._mode == ScannerMode.PREVIEW:
-            for _, filter_ in self._filters:
-                page = filter_.apply(page)
+        for _, filter_ in self._filters:
+            page = filter_.apply(page)
 
         return page

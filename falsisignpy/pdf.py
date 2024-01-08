@@ -59,7 +59,7 @@ class PDF:
         if page_number >= len(self._pages):
             raise RuntimeError(f"Page {page_number} does not exist.")
 
-        return self._pages[page_number]
+        return self._pages[page_number].copy()
 
     @property
     def num_pages(self) -> int:
