@@ -5,10 +5,10 @@ from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import PySimpleGUI as sg
+import scanner
 import utils
 from pdf import PDF
 from PIL import Image
-from scanner import Scanner
 from signature import Signature
 
 SIGNATURES_FOLDER = pl.Path(__file__).parent / "signatures"
@@ -22,7 +22,7 @@ class Mode(Enum):
 class FalsiSignPy:
     def __init__(self) -> None:
         self._running = False
-        self._scanner: Optional[Scanner] = None
+        self._scanner: Optional[scanner.Scanner] = None
         self._current_page_figure_id: Optional[int] = None
         self._current_page: int = 0
         self._floating_signature_figure_id: Optional[int] = None
@@ -36,44 +36,61 @@ class FalsiSignPy:
         self._mode: Mode = Mode.PREVIEW
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
-    def _create_window(self) -> sg.Window:
-        col_left = [
-            [sg.T("Select input pdf file:")],
-            [
-                sg.Input(readonly=True, key="-INPUT-", enable_events=True),
-                sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
-            ],
-            [sg.HSeparator()],
-            [sg.Text("Scanner effects:")],
-            [
-                sg.Checkbox("Random blur"),
-                sg.Slider((0, 1), resolution=0.01, orientation="horizontal"),
-            ],
-            [
-                sg.Checkbox("Random rotate"),
-                sg.Slider((0, 1), resolution=0.01, orientation="horizontal"),
-            ],
-            [
-                sg.Checkbox("Gamma"),
-                sg.Slider((0, 1), resolution=0.01, orientation="horizontal"),
-            ],
-            [sg.Checkbox("Grayscale")],
-            [sg.HSeparator()],
-            [sg.Text("Place signature:")],
-            [
-                sg.Combo(
-                    list(self._loaded_signatures.keys()),
-                    default_value=list(self._loaded_signatures.keys())[0],
-                    key="-DROPDOWN-",
-                    enable_events=True,
-                    readonly=True,
-                )
-            ],
-            [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
-            [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
-            [sg.HSeparator()],
-            [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True, default=True)],
+        self._filters = [
+            scanner.Grayscale("Grayscale", enabled=True),
+            scanner.Blur("Random blur", enabled=True, initial_strength=0.0, strength_range=(1, 100)),
+            scanner.Rotate("Random rotate", enabled=True, initial_strength=0.0, strength_range=(1, 100)),
+            scanner.Gamma("Gamma", enabled=True, initial_strength=0.0, strength_range=(1, 100)),
         ]
+
+    def _create_window(self) -> sg.Window:
+        col_left = (
+            [
+                [sg.T("Select input pdf file:")],
+                [
+                    sg.Input(readonly=True, key="-INPUT-", enable_events=True),
+                    sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
+                ],
+                [sg.HSeparator()],
+                [sg.Text("Scanner effects:")],
+            ]
+            + [
+                [
+                    sg.Checkbox(
+                        filter_.name,
+                        key=f"-{filter_.__class__.__name__.upper()}-",
+                        enable_events=True,
+                    ),
+                    sg.Slider(
+                        range=filter_.strength_range,
+                        resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 10,
+                        orientation="horizontal",
+                        key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-",
+                        enable_events=True,
+                    )
+                    if filter_.strength_range is not None
+                    else sg.Text(),
+                ]
+                for filter_ in self._filters
+            ]
+            + [
+                [sg.HSeparator()],
+                [sg.Text("Place signature:")],
+                [
+                    sg.Combo(
+                        list(self._loaded_signatures.keys()),
+                        default_value=list(self._loaded_signatures.keys())[0],
+                        key="-DROPDOWN-",
+                        enable_events=True,
+                        readonly=True,
+                    )
+                ],
+                [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
+                [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
+                [sg.HSeparator()],
+                [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True, default=True)],
+            ]
+        )
 
         col_right = [
             [sg.Button("Save pdf...", key="-SAVE-")],
@@ -297,7 +314,7 @@ class FalsiSignPy:
 
     def start(self) -> None:
         self._running = True
-        self._scanner = Scanner()
+        self._scanner = scanner.Scanner()
         self._loaded_signatures = self._load_signatures_or_fail(SIGNATURES_FOLDER)
 
         self._window: sg.Window = self._create_window()
@@ -321,6 +338,14 @@ class FalsiSignPy:
         self._event_handlers["-NEXT-"] = self._on_next_page_clicked
         self._event_handlers["-INPUT-"] = self._on_input_file_selected
         self._event_handlers["-CONFIGURE-"] = self._on_window_resized
+
+        for filter_ in self._filters:
+            key = filter_.__class__.__name__.upper()
+            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: f.set_enabled(e[f"-{k}-"])
+            if filter_.strength_range is not None:
+                self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: f.set_strength(
+                    e[f"-{k}-STRENGTH-"]
+                )
 
         while self._running:
             event, values = self._window.read()

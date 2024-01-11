@@ -1,29 +1,36 @@
 import abc
-from collections.abc import Mapping
-from typing import Dict, Iterable, Tuple
+from typing import Optional, Tuple
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 
 class Filter(abc.ABC):
-    def __init__(self, enabled: bool, strength: float) -> None:
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        initial_strength: Optional[float] = None,
+        strength_range: Optional[Tuple[float, float]] = None,
+    ) -> None:
+        self._name = name
         self._enabled = enabled
-        self._strength = strength
+        self._strength = initial_strength
+        self._strength_range = strength_range
 
     @property
-    def enabled(self) -> bool:
-        return self._enabled
+    def name(self) -> str:
+        return self._name
 
-    @enabled.setter
-    def enabled(self, value: bool) -> None:
+    def set_enabled(self, value: bool) -> None:
+        print(f"Setting {self._name} to {value}")
         self._enabled = value
 
     @property
-    def strength(self) -> float:
-        return self._strength
+    def strength_range(self) -> Optional[Tuple[float, float]]:
+        return self._strength_range
 
-    @strength.setter
-    def strength(self, value: bool) -> None:
+    def set_strength(self, value: bool) -> None:
+        print(f"Setting {self._name} strength to {value}")
         self._strength = value
 
     @abc.abstractmethod
@@ -38,37 +45,29 @@ class Filter(abc.ABC):
         return self._apply(image)
 
 
-class FilterCollection(Mapping):
-    def __init__(self) -> None:
-        self._filters: Dict[str, Filter] = {}
-
-    def __getitem__(self, key: str) -> Filter:
-        return self._filters[key]
-
-    def __len__(self) -> int:
-        return len(self._filters)
-
-    def __iter__(self) -> Iterable[Tuple[str, Filter]]:
-        return iter(self._filters.items())
-
-    def add(self, name: str, filter_: Filter) -> None:
-        self._filters[name] = filter_
-
-
-class InvertFilter(Filter):
+class Grayscale(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
-        return ImageOps.invert(image)
+        return image.convert("L")
+
+
+class Gamma(Filter):
+    def _apply(self, image: Image.Image) -> Image.Image:
+        return ImageOps.autocontrast(image, cutoff=0, ignore=None)
+
+
+class Blur(Filter):
+    def _apply(self, image: Image.Image) -> Image.Image:
+        return image.filter(ImageFilter.BLUR)
+
+
+class Rotate(Filter):
+    def _apply(self, image: Image.Image) -> Image.Image:
+        return image.rotate(self._strength)
 
 
 class Scanner:
-    def __init__(self) -> None:
-        self._filters = FilterCollection()
-
-        # TODO: Consider removing filter names
-        self._filters.add("invert", InvertFilter(enabled=True, strength=1.0))
-
     def apply(self, page: Image.Image) -> Image.Image:
-        for _, filter_ in self._filters:
-            page = filter_.apply(page)
+        # for _, filter_ in self._filters:
+        #     page = filter_.apply(page)
 
         return page
