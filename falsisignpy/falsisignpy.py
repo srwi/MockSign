@@ -22,7 +22,6 @@ class Mode(Enum):
 class FalsiSignPy:
     def __init__(self) -> None:
         self._running = False
-        self._scanner: Optional[scanner.Scanner] = None
         self._current_page_figure_id: Optional[int] = None
         self._current_page: int = 0
         self._floating_signature_figure_id: Optional[int] = None
@@ -38,9 +37,9 @@ class FalsiSignPy:
 
         self._filters = [
             scanner.Grayscale("Grayscale", enabled=True),
-            scanner.Blur("Random blur", enabled=True, initial_strength=0.0, strength_range=(1, 100)),
-            scanner.Rotate("Random rotate", enabled=True, initial_strength=0.0, strength_range=(1, 100)),
-            scanner.Gamma("Gamma", enabled=True, initial_strength=0.0, strength_range=(1, 100)),
+            scanner.Blur("Random blur", enabled=True, initial_strength=2, strength_range=(0, 20)),
+            scanner.Rotate("Random rotate", enabled=True, initial_strength=2, strength_range=(0, 10)),
+            scanner.AutoContrast("Autocontrast cutoff", enabled=True, initial_strength=10, strength_range=(0, 45)),
         ]
 
     def _create_window(self) -> sg.Window:
@@ -59,6 +58,7 @@ class FalsiSignPy:
                     sg.Checkbox(
                         filter_.name,
                         key=f"-{filter_.__class__.__name__.upper()}-",
+                        default=filter_.enabled,
                         enable_events=True,
                     ),
                     sg.Slider(
@@ -66,6 +66,7 @@ class FalsiSignPy:
                         resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 10,
                         orientation="horizontal",
                         key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-",
+                        default_value=filter_.strength,
                         enable_events=True,
                     )
                     if filter_.strength_range is not None
@@ -154,9 +155,9 @@ class FalsiSignPy:
 
     def _update_page(self, page_image: Image.Image) -> None:
         new_page_image = page_image.copy()
-        print("update page", self._mode)
         if self._mode == Mode.PREVIEW:
-            new_page_image = self._scanner.apply(new_page_image)
+            for filter_ in self._filters:
+                new_page_image = filter_.apply(new_page_image)
 
         # Match document coordinate system
         graph_size = self._graph.get_size()
@@ -312,9 +313,16 @@ class FalsiSignPy:
     def _on_win_closed(self, _: Dict[str, Any]) -> None:
         self._running = False
 
+    def _set_filter_enabled(self, event: Dict[str, Any], filter_: scanner.Filter, key: str) -> None:
+        filter_.set_enabled(event[key])
+        self._update_current_page()
+
+    def _set_filter_strength(self, event: Dict[str, Any], filter_: scanner.Filter, key: str) -> None:
+        filter_.set_strength(event[key])
+        self._update_current_page()
+
     def start(self) -> None:
         self._running = True
-        self._scanner = scanner.Scanner()
         self._loaded_signatures = self._load_signatures_or_fail(SIGNATURES_FOLDER)
 
         self._window: sg.Window = self._create_window()
@@ -341,10 +349,10 @@ class FalsiSignPy:
 
         for filter_ in self._filters:
             key = filter_.__class__.__name__.upper()
-            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: f.set_enabled(e[f"-{k}-"])
+            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: self._set_filter_enabled(e, f, f"-{k}-")
             if filter_.strength_range is not None:
-                self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: f.set_strength(
-                    e[f"-{k}-STRENGTH-"]
+                self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: self._set_filter_strength(
+                    e, f, f"-{k}-STRENGTH-"
                 )
 
         while self._running:

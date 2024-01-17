@@ -1,4 +1,5 @@
 import abc
+import random
 from typing import Optional, Tuple
 
 from PIL import Image, ImageFilter, ImageOps
@@ -21,16 +22,22 @@ class Filter(abc.ABC):
     def name(self) -> str:
         return self._name
 
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
     def set_enabled(self, value: bool) -> None:
-        print(f"Setting {self._name} to {value}")
         self._enabled = value
 
     @property
     def strength_range(self) -> Optional[Tuple[float, float]]:
         return self._strength_range
 
+    @property
+    def strength(self) -> Optional[float]:
+        return self._strength
+
     def set_strength(self, value: bool) -> None:
-        print(f"Setting {self._name} strength to {value}")
         self._strength = value
 
     @abc.abstractmethod
@@ -50,24 +57,17 @@ class Grayscale(Filter):
         return image.convert("L")
 
 
-class Gamma(Filter):
+class AutoContrast(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
-        return ImageOps.autocontrast(image, cutoff=0, ignore=None)
+        return ImageOps.autocontrast(image, cutoff=int(self.strength))
 
 
 class Blur(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
-        return image.filter(ImageFilter.BLUR)
+        return image.filter(ImageFilter.GaussianBlur(self._strength))
 
 
 class Rotate(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
-        return image.rotate(self._strength)
-
-
-class Scanner:
-    def apply(self, page: Image.Image) -> Image.Image:
-        # for _, filter_ in self._filters:
-        #     page = filter_.apply(page)
-
-        return page
+        random_strength = random.uniform(-float(self.strength), float(self.strength))
+        return image.rotate(angle=random_strength, fillcolor="white")
