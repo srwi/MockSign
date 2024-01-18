@@ -248,11 +248,14 @@ class FalsiSignPy:
             )
             self._floating_signature_figure_id = None  # Anchor floating signature
 
-    @staticmethod
-    def _on_save_clicked(_: Dict[str, Any]) -> None:
+    def _on_save_clicked(self, _: Dict[str, Any]) -> None:
+        if self._pdf is None or not self._pdf.loaded:
+            print("Please load a PDF file before saving.")
+            return
+
         filename = sg.popup_get_file("Save pdf...", save_as=True)
-        if filename is not None:
-            pass
+        if filename:
+            self._pdf.save(path=pl.Path(filename), filters=self._filters)
 
     def _redraw_page_signatures(self) -> None:
         page_signatures = self._pdf.get_page_signatures(self._current_page)
@@ -316,6 +319,10 @@ class FalsiSignPy:
         filter_.set_strength(event[key])
         self._update_current_page()
 
+    def _set_remove_background(self, event: Dict[str, Any]) -> None:
+        self._pdf.set_remove_signature_background(event["-REMOVE-BG-"])
+        self._update_current_page()
+
     def start(self) -> None:
         self._running = True
         self._loaded_signatures = self._load_signatures_or_fail(SIGNATURES_FOLDER)
@@ -333,6 +340,7 @@ class FalsiSignPy:
         self._event_handlers["-GRAPH-+WHEEL"] = self._on_graph_mouse_wheel
         self._event_handlers["-GRAPH-"] = self._on_graph_clicked
         self._event_handlers["-DROPDOWN-"] = self._on_signature_selected
+        self._event_handlers["-REMOVE-BG-"] = self._set_remove_background
         self._event_handlers["-PLACE-"] = self._on_signature_selected
         self._event_handlers["-REMOVE-"] = self._on_remove_selected
         self._event_handlers["-PREVIEW-"] = self._on_preview_selected

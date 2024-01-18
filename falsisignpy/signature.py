@@ -1,7 +1,33 @@
 from typing import Optional, Tuple, Union
 
+import cv2
+import numpy as np
 import utils
+from cv2 import seamlessClone
 from PIL import Image
+
+
+def seamless_clone(image: Image.Image, signature: Image.Image, location: Tuple[int, int]) -> Image.Image:
+    x, y = location
+    signature_width, signature_height = signature.size
+    signature = np.array(signature)
+    target_image = np.array(image)
+
+    cropped_signature = signature[
+        : min(signature_height, target_image.shape[0] - y), : min(signature_width, target_image.shape[1] - x)
+    ]
+    location_center = (x + cropped_signature.shape[1] // 2, y + cropped_signature.shape[0] // 2)
+    mask = np.ones_like(cropped_signature) * 255
+
+    cloned_image = seamlessClone(
+        src=cropped_signature,
+        dst=target_image,
+        mask=mask,
+        p=location_center,
+        flags=cv2.MIXED_CLONE,
+    )
+
+    return Image.fromarray(cloned_image)
 
 
 class Signature:
@@ -42,5 +68,8 @@ class Signature:
     def draw(self, image: Image.Image, remove_background: bool) -> Image.Image:
         image = image.copy()
         flipped_y_location = (self._location[0], image.size[1] - self._location[1])
-        image.paste(self.get_scaled_signature(), flipped_y_location)
+        if remove_background:
+            image = seamless_clone(image, self.get_scaled_signature(), flipped_y_location)
+        else:
+            image.paste(self.get_scaled_signature(), flipped_y_location)
         return image

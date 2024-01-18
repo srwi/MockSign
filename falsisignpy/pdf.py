@@ -2,6 +2,7 @@ import pathlib as pl
 from typing import Dict, List
 
 import fitz
+import scanner
 from PIL import Image
 from signature import Signature
 
@@ -50,11 +51,19 @@ class PDF:
 
         self._signatures[page_number] = {}
 
-    def save(self, path: pl.Path) -> None:
+    def save(self, path: pl.Path, filters: List[scanner.Filter]) -> None:
         if len(self._pages) == 0:
             raise RuntimeError("Can not save empty document.")
 
-        self._pages[0].save(path, "PDF", resolution=100.0, save_all=True, append_images=self._pages[1:])
+        signed_pages = [self.get_page_image(i, signed=True) for i in range(len(self._pages))]
+
+        scanned_pages = []
+        for i, page in enumerate(signed_pages):
+            for filter_ in filters:
+                page = filter_.apply(page)
+            scanned_pages.append(page)
+
+        scanned_pages[0].save(path, "PDF", resolution=100.0, save_all=True, append_images=scanned_pages[1:])
 
     def get_page_image(self, page_number: int, signed: bool) -> Image.Image:
         if page_number >= len(self._pages):
@@ -66,6 +75,9 @@ class PDF:
                 image = signature.draw(image, remove_background=self._remove_signature_background)
 
         return image
+
+    def set_remove_signature_background(self, value: bool) -> None:
+        self._remove_signature_background = value
 
     @property
     def num_pages(self) -> int:
