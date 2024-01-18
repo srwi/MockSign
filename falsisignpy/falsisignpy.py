@@ -32,7 +32,7 @@ class FalsiSignPy:
         self._window: Optional[sg.Window] = None
         self._graph: Optional[sg.Graph] = None
         self._pdf: Optional[PDF] = None
-        self._mode: Mode = Mode.PREVIEW
+        self._mode: Mode = Mode.EDIT
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
         self._filters = [
@@ -43,27 +43,7 @@ class FalsiSignPy:
         ]
 
     def _create_window(self) -> sg.Window:
-        col_left = [
-            [sg.T("Input PDF:")],
-            [
-                sg.Input(readonly=True, key="-INPUT-", enable_events=True),
-                sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
-            ],
-            [sg.HSeparator()],
-            [sg.Text("Place signature:")],
-            [
-                sg.Combo(
-                    list(self._loaded_signatures.keys()),
-                    default_value=list(self._loaded_signatures.keys())[0],
-                    key="-DROPDOWN-",
-                    enable_events=True,
-                    readonly=True,
-                )
-            ],
-            [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
-            [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
-            [sg.HSeparator()],
-            [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True, default=True)],
+        self._scanner_options = [
             [sg.Text("Scanner options:")],
             [sg.Checkbox("Remove signature background", key="-REMOVE-BG-", enable_events=True, default=True)],
         ] + [
@@ -87,6 +67,29 @@ class FalsiSignPy:
             ]
             for filter_ in self._filters
         ]
+
+        col_left = [
+            [sg.T("Input PDF:")],
+            [
+                sg.Input(readonly=True, key="-INPUT-", enable_events=True),
+                sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
+            ],
+            [sg.HSeparator()],
+            [sg.Text("Place signature:")],
+            [
+                sg.Combo(
+                    list(self._loaded_signatures.keys()),
+                    default_value=list(self._loaded_signatures.keys())[0],
+                    key="-DROPDOWN-",
+                    enable_events=True,
+                    readonly=True,
+                )
+            ],
+            [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True, default=True)],
+            [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
+            [sg.HSeparator()],
+            [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True)],
+        ] + self._scanner_options
 
         col_right = [
             [sg.Button("Save pdf...", key="-SAVE-", disabled=True)],
@@ -116,8 +119,21 @@ class FalsiSignPy:
 
         return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
 
-    def _set_disabled(self, key: str, state: bool) -> None:
-        self._window[key].update(disabled=state)
+    def _set_disabled(self, element: Any, disabled: bool) -> None:
+        if isinstance(element, list):
+            for element in element:
+                self._set_disabled(element, disabled)
+        elif getattr(element, "Disabled", None) is not None:
+            if isinstance(element, sg.Slider):
+                element.Widget.config(troughcolor="#607082" if disabled else sg.theme_slider_color())
+                element.Widget.config(foreground="grey43" if disabled else sg.theme_text_color())
+                element.update(disabled=disabled)
+            elif isinstance(element, sg.Combo):
+                element.Widget.config(background="red" if disabled else sg.theme_input_background_color())
+                element.Widget.config(foreground="grey43" if disabled else sg.theme_input_text_color())
+                element.update(disabled=disabled)
+            elif isinstance(element, sg.Element):
+                element.update(disabled=disabled)
 
     @staticmethod
     def _load_signatures_or_fail(path: pl.Path) -> Dict[str, Image.Image]:
@@ -213,6 +229,8 @@ class FalsiSignPy:
 
     def _set_mode(self, mode: Mode) -> None:
         self._mode = mode
+        self._set_disabled(self._scanner_options, mode == Mode.EDIT)
+        self._set_disabled(self._window["-DROPDOWN-"], mode == Mode.PREVIEW)
         self._update_current_page()
 
     def _on_signature_selected(self, values: Dict[str, Any]) -> None:
@@ -308,7 +326,8 @@ class FalsiSignPy:
         self._current_page = 0
         current_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
         self._update_page(current_page_image)
-        self._set_disabled("-SAVE-", False)
+        self._set_disabled("-SAVE-", disabled=False)
+        self._set_disabled(self._scanner_options, True)
 
     def _on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
@@ -356,6 +375,8 @@ class FalsiSignPy:
         self._event_handlers["-NEXT-"] = self._on_next_page_clicked
         self._event_handlers["-INPUT-"] = self._on_input_file_selected
         self._event_handlers["-CONFIGURE-"] = self._on_window_resized
+
+        self._set_disabled(self._scanner_options, True)
 
         for filter_ in self._filters:
             key = filter_.__class__.__name__.upper()
