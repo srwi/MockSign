@@ -41,5 +41,6 @@ class Signature:
 
     def draw(self, image: Image.Image, remove_background: bool) -> Image.Image:
         image = image.copy()
-        image.paste(self.get_scaled_signature(), self._location)
+        flipped_y_location = (self._location[0], image.size[1] - self._location[1])
+        image.paste(self.get_scaled_signature(), flipped_y_location)
         return image

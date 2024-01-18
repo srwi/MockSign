@@ -37,9 +37,9 @@ class FalsiSignPy:
 
         self._filters = [
             scanner.Grayscale("Grayscale", enabled=True),
-            scanner.Blur("Blur", enabled=True, initial_strength=2, strength_range=(0, 20)),
-            scanner.Rotate("Random rotate", enabled=True, initial_strength=2, strength_range=(0, 10)),
-            scanner.AutoContrast("Autocontrast cutoff", enabled=True, initial_strength=10, strength_range=(0, 45)),
+            scanner.Blur("Blur", enabled=False, initial_strength=1, strength_range=(0, 20)),
+            scanner.Rotate("Random rotate", enabled=True, initial_strength=1, strength_range=(0, 10)),
+            scanner.AutoContrast("Autocontrast cutoff", enabled=True, initial_strength=2, strength_range=(0, 45)),
         ]
 
     def _create_window(self) -> sg.Window:
@@ -131,7 +131,7 @@ class FalsiSignPy:
             exit(1)
         return signatures
 
-    def _place_floating_signature(self, signature_image: Image.Image, cursor_position: Tuple[int, int]) -> None:
+    def _place_floating_signature(self, signature_image: Image.Image, cursor_xy: Tuple[int, int]) -> None:
         new_size = (
             int(signature_image.width * self._signature_zoom_level / self._scaling_factor),
             int(signature_image.height * self._signature_zoom_level / self._scaling_factor),
@@ -139,7 +139,7 @@ class FalsiSignPy:
         scaled_signature_image = signature_image.copy().resize(new_size)
         scaled_signature_bytes = utils.image_to_bytes(scaled_signature_image)
 
-        placed_figure: int = self._graph.draw_image(data=scaled_signature_bytes, location=cursor_position)
+        placed_figure: int = self._graph.draw_image(data=scaled_signature_bytes, location=cursor_xy)
         if self._floating_signature_figure_id is not None:
             self._graph.delete_figure(self._floating_signature_figure_id)
             self._floating_signature_figure_id = None
@@ -189,8 +189,8 @@ class FalsiSignPy:
         if not values["-PLACE-"]:
             return
 
-        cursor_position = values["-GRAPH-"]
-        self._place_floating_signature(self._selected_signature_image, cursor_position)
+        cursor_xy = values["-GRAPH-"]
+        self._place_floating_signature(self._selected_signature_image, cursor_xy)
 
     def _on_graph_leave(self, _: Dict[str, Any]) -> None:
         if self._floating_signature_figure_id is not None:
@@ -203,8 +203,8 @@ class FalsiSignPy:
         mouse_wheel_up = self._graph.user_bind_event.delta > 0
         self._signature_zoom_level *= 1.1 if mouse_wheel_up else 0.9
 
-        cursor_position = values["-GRAPH-"]
-        self._place_floating_signature(self._selected_signature_image, cursor_position)
+        cursor_xy = values["-GRAPH-"]
+        self._place_floating_signature(self._selected_signature_image, cursor_xy)
 
     def _set_mode(self, mode: Mode) -> None:
         self._mode = mode
@@ -221,9 +221,9 @@ class FalsiSignPy:
         self._set_mode(Mode.PREVIEW)
 
     def _on_graph_clicked(self, values: Dict[str, Any]) -> None:
-        cursor_position = values["-GRAPH-"]
+        cursor_xy = values["-GRAPH-"]
         if values["-REMOVE-"]:
-            figure_ids_at_location = self._graph.get_figures_at_location(cursor_position)
+            figure_ids_at_location = self._graph.get_figures_at_location(cursor_xy)
             for id_ in reversed(figure_ids_at_location):
                 if id_ == self._current_page_figure_id:
                     continue
@@ -238,7 +238,7 @@ class FalsiSignPy:
                 return
             placed_signature = Signature(
                 image=self._selected_signature_image,
-                location=cursor_position,
+                location=cursor_xy,
                 scale=self._signature_zoom_level,
             )
             self._pdf.place_signature(

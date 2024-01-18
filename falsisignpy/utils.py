@@ -27,34 +27,6 @@ def calculate_padded_image_coordinates(
         return 0, top_offset, target_size[0], scaled_height, image_size[0] / target_size[0]
 
 
-def graph_to_page_coordinates(
-    graph_coordinates: Tuple[int, int],
-    graph_size: Tuple[int, int],
-    page_size: Tuple[int, int],
-) -> Tuple[float, float]:
-    left_offset, top_offset, width, height, _ = calculate_padded_image_coordinates(
-        image_size=page_size, target_size=graph_size
-    )
-    return (
-        (graph_coordinates[0] - left_offset) * (page_size[0] / width),
-        (graph_coordinates[1] - top_offset) * (page_size[1] / height),
-    )
-
-
-def page_to_graph_coordinates(
-    page_coordinates: Tuple[int, int],
-    graph_size: Tuple[int, int],
-    page_size: Tuple[int, int],
-) -> Tuple[float, float]:
-    left_offset, top_offset, width, height, _ = calculate_padded_image_coordinates(
-        image_size=page_size, target_size=graph_size
-    )
-    return (
-        page_coordinates[0] * (width / page_size[0]) + left_offset,
-        page_coordinates[1] * (height / page_size[1]) + top_offset,
-    )
-
-
 def resize_and_pad_image(image: Image.Image, target_size: Tuple[int, int]) -> Image.Image:
     image = image.copy()
 
