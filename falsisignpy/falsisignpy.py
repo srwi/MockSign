@@ -60,12 +60,12 @@ class FalsiSignPy:
                     readonly=True,
                 )
             ],
-            [sg.Checkbox("Remove background", key="-REMOVE-BG-", enable_events=True, default=True)],
             [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
             [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
             [sg.HSeparator()],
             [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True, default=True)],
             [sg.Text("Scanner options:")],
+            [sg.Checkbox("Remove signature background", key="-REMOVE-BG-", enable_events=True, default=True)],
         ] + [
             [
                 sg.Checkbox(
@@ -89,11 +89,11 @@ class FalsiSignPy:
         ]
 
         col_right = [
-            [sg.Button("Save pdf...", key="-SAVE-")],
+            [sg.Button("Save pdf...", key="-SAVE-", disabled=True)],
             [
-                sg.Button("<", key="-PREVIOUS-"),
+                sg.Button("<", key="-PREVIOUS-", disabled=True),
                 sg.Text("No file loaded", key="-CURRENT-PAGE-"),
-                sg.Button(">", key="-NEXT-"),
+                sg.Button(">", key="-NEXT-", disabled=True),
             ],
             [
                 sg.Graph(
@@ -112,10 +112,12 @@ class FalsiSignPy:
 
         layout = [
             [sg.Col(col_left), sg.Col(col_right, expand_y=True, expand_x=True)],
-            [sg.Text(key="-INFO-", size=(60, 1))],
         ]
 
         return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
+
+    def _set_disabled(self, key: str, state: bool) -> None:
+        self._window[key].update(disabled=state)
 
     @staticmethod
     def _load_signatures_or_fail(path: pl.Path) -> Dict[str, Image.Image]:
@@ -145,8 +147,11 @@ class FalsiSignPy:
             self._floating_signature_figure_id = None
         self._floating_signature_figure_id = placed_figure
 
-    def _describe_page(self, page_number: int) -> str:
-        return f"Page {page_number + 1}/{self._pdf.num_pages}"
+    def _update_page_navigation(self) -> None:
+        description = f"Page {self._current_page + 1}/{self._pdf.num_pages}"
+        self._window["-CURRENT-PAGE-"].update(description)
+        self._window["-PREVIOUS-"].update(disabled=self._current_page == 0)
+        self._window["-NEXT-"].update(disabled=self._current_page == self._pdf.num_pages - 1)
 
     def _update_page(self, page_image: Image.Image) -> None:
         new_page_image = page_image.copy()
@@ -173,7 +178,7 @@ class FalsiSignPy:
             data=utils.image_to_bytes(new_page_image_resized), location=(-h_offset, v_offset + new_page_image.height)
         )
 
-        self._window["-CURRENT-PAGE-"].update(self._describe_page(self._current_page))
+        self._update_page_navigation()
 
         if self._mode == Mode.EDIT:
             self._redraw_page_signatures()
@@ -300,8 +305,10 @@ class FalsiSignPy:
             return
         filename = pl.Path(input_file)
         self._pdf = PDF(filename, remove_signature_background=values["-REMOVE-BG-"])
-        current_page = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
-        self._update_page(current_page)
+        self._current_page = 0
+        current_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
+        self._update_page(current_page_image)
+        self._set_disabled("-SAVE-", False)
 
     def _on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
