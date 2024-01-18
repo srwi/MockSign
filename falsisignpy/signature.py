@@ -1,8 +1,7 @@
 from typing import Optional, Tuple, Union
 
-from PIL import Image
-
 import utils
+from PIL import Image
 
 
 class Signature:
@@ -39,3 +38,8 @@ class Signature:
             self._scale = value
             self._scaled_image_cache = None
             self._scaled_bytes_cache = None
+
+    def draw(self, image: Image.Image, remove_background: bool) -> Image.Image:
+        image = image.copy()
+        image.paste(self.get_scaled_signature(), self._location)
+        return image

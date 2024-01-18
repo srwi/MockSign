@@ -3,6 +3,7 @@ import random
 from typing import Optional, Tuple
 
 from PIL import Image, ImageFilter, ImageOps
+from PIL.Image import Resampling
 
 
 class Filter(abc.ABC):
@@ -70,4 +71,4 @@ class Blur(Filter):
 class Rotate(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
         random_strength = random.uniform(-float(self.strength), float(self.strength))
-        return image.rotate(angle=random_strength, fillcolor="white")
+        return image.rotate(angle=random_strength, fillcolor="white", resample=Resampling.BILINEAR)

@@ -7,8 +7,9 @@ from signature import Signature
 
 
 class PDF:
-    def __init__(self, path: pl.Path) -> None:
+    def __init__(self, path: pl.Path, remove_signature_background: bool) -> None:
         self._pages: List[Image] = []
+        self._remove_signature_background = remove_signature_background
 
         document = fitz.Document(path)
         for i in range(document.page_count):
@@ -55,11 +56,16 @@ class PDF:
 
         self._pages[0].save(path, "PDF", resolution=100.0, save_all=True, append_images=self._pages[1:])
 
-    def get_page_image(self, page_number: int) -> Image.Image:
+    def get_page_image(self, page_number: int, signed: bool) -> Image.Image:
         if page_number >= len(self._pages):
             raise RuntimeError(f"Page {page_number} does not exist.")
 
-        return self._pages[page_number].copy()
+        image = self._pages[page_number].copy()
+        if signed:
+            for signature in self.get_page_signatures(page_number):
+                image = signature.draw(image, remove_background=self._remove_signature_background)
+
+        return image
 
     @property
     def num_pages(self) -> int:

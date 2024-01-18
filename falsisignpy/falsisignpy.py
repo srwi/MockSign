@@ -37,61 +37,56 @@ class FalsiSignPy:
 
         self._filters = [
             scanner.Grayscale("Grayscale", enabled=True),
-            scanner.Blur("Random blur", enabled=True, initial_strength=2, strength_range=(0, 20)),
+            scanner.Blur("Blur", enabled=True, initial_strength=2, strength_range=(0, 20)),
             scanner.Rotate("Random rotate", enabled=True, initial_strength=2, strength_range=(0, 10)),
             scanner.AutoContrast("Autocontrast cutoff", enabled=True, initial_strength=10, strength_range=(0, 45)),
         ]
 
     def _create_window(self) -> sg.Window:
-        col_left = (
+        col_left = [
+            [sg.T("Input PDF:")],
             [
-                [sg.T("Select input pdf file:")],
-                [
-                    sg.Input(readonly=True, key="-INPUT-", enable_events=True),
-                    sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
-                ],
-                [sg.HSeparator()],
-                [sg.Text("Scanner effects:")],
+                sg.Input(readonly=True, key="-INPUT-", enable_events=True),
+                sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
+            ],
+            [sg.HSeparator()],
+            [sg.Text("Place signature:")],
+            [
+                sg.Combo(
+                    list(self._loaded_signatures.keys()),
+                    default_value=list(self._loaded_signatures.keys())[0],
+                    key="-DROPDOWN-",
+                    enable_events=True,
+                    readonly=True,
+                )
+            ],
+            [sg.Checkbox("Remove background", key="-REMOVE-BG-", enable_events=True, default=True)],
+            [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
+            [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
+            [sg.HSeparator()],
+            [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True, default=True)],
+            [sg.Text("Scanner options:")],
+        ] + [
+            [
+                sg.Checkbox(
+                    filter_.name,
+                    key=f"-{filter_.__class__.__name__.upper()}-",
+                    default=filter_.enabled,
+                    enable_events=True,
+                ),
+                sg.Slider(
+                    range=filter_.strength_range,
+                    resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 100,
+                    orientation="horizontal",
+                    key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-",
+                    default_value=filter_.strength,
+                    enable_events=True,
+                )
+                if filter_.strength_range is not None
+                else sg.Text(),
             ]
-            + [
-                [
-                    sg.Checkbox(
-                        filter_.name,
-                        key=f"-{filter_.__class__.__name__.upper()}-",
-                        default=filter_.enabled,
-                        enable_events=True,
-                    ),
-                    sg.Slider(
-                        range=filter_.strength_range,
-                        resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 10,
-                        orientation="horizontal",
-                        key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-",
-                        default_value=filter_.strength,
-                        enable_events=True,
-                    )
-                    if filter_.strength_range is not None
-                    else sg.Text(),
-                ]
-                for filter_ in self._filters
-            ]
-            + [
-                [sg.HSeparator()],
-                [sg.Text("Place signature:")],
-                [
-                    sg.Combo(
-                        list(self._loaded_signatures.keys()),
-                        default_value=list(self._loaded_signatures.keys())[0],
-                        key="-DROPDOWN-",
-                        enable_events=True,
-                        readonly=True,
-                    )
-                ],
-                [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True)],
-                [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
-                [sg.HSeparator()],
-                [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True, default=True)],
-            ]
-        )
+            for filter_ in self._filters
+        ]
 
         col_right = [
             [sg.Button("Save pdf...", key="-SAVE-")],
@@ -187,7 +182,7 @@ class FalsiSignPy:
         if self._pdf is None or not self._pdf.loaded:
             return
 
-        current_page_image = self._pdf.get_page_image(self._current_page)
+        current_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
         self._update_page(current_page_image)
 
     def _on_graph_move(self, values: Dict[str, Any]) -> None:
@@ -287,7 +282,7 @@ class FalsiSignPy:
         for id_ in self._pdf.get_page_signature_ids(self._current_page):
             self._graph.delete_figure(id_)
         self._current_page = new_page_number
-        new_page_image = self._pdf.get_page_image(self._current_page)
+        new_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
         self._update_page(new_page_image)
 
     def _on_previous_page_clicked(self, _: Dict[str, Any]) -> None:
@@ -301,13 +296,13 @@ class FalsiSignPy:
         if not input_file:
             return
         filename = pl.Path(input_file)
-        self._pdf = PDF(filename)
-        current_page = self._pdf.get_page_image(self._current_page)
+        self._pdf = PDF(filename, remove_signature_background=values["-REMOVE-BG-"])
+        current_page = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
         self._update_page(current_page)
 
     def _on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
-            current_page = self._pdf.get_page_image(self._current_page)
+            current_page = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
             self._update_page(current_page)
 
     def _on_win_closed(self, _: Dict[str, Any]) -> None:
