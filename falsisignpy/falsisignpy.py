@@ -125,7 +125,7 @@ class FalsiSignPy:
                 self._set_disabled(element, disabled)
         elif getattr(element, "Disabled", None) is not None:
             if isinstance(element, sg.Slider):
-                element.Widget.config(troughcolor="#607082" if disabled else sg.theme_slider_color())
+                element.Widget.config(troughcolor="#6D7F93" if disabled else sg.theme_slider_color())
                 element.Widget.config(foreground="grey43" if disabled else sg.theme_text_color())
                 element.update(disabled=disabled)
             elif isinstance(element, sg.Combo):
