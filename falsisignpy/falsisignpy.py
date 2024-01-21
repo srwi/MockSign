@@ -44,7 +44,6 @@ class FalsiSignPy:
 
     def _create_window(self) -> sg.Window:
         self._scanner_options = [
-            [sg.Text("Scanner options:")],
             [sg.Checkbox("Remove signature background", key="-REMOVE-BG-", enable_events=True, default=True)],
         ] + [
             [
@@ -69,27 +68,62 @@ class FalsiSignPy:
         ]
 
         col_left = [
-            [sg.T("Input PDF:")],
             [
-                sg.Input(readonly=True, key="-INPUT-", enable_events=True),
-                sg.FileBrowse(file_types=[("PDF", "*.pdf")]),
-            ],
-            [sg.HSeparator()],
-            [sg.Text("Place signature:")],
-            [
-                sg.Combo(
-                    list(self._loaded_signatures.keys()),
-                    default_value=list(self._loaded_signatures.keys())[0],
-                    key="-DROPDOWN-",
-                    enable_events=True,
-                    readonly=True,
+                sg.Frame(
+                    "Input",
+                    [
+                        [
+                            sg.Text("File:"),
+                            sg.Text(
+                                "No file loaded",
+                                auto_size_text=False,
+                                expand_x=True,
+                                key="-PDF-FILE-TEXT-",
+                            ),
+                            sg.FileBrowse(
+                                key="-PDF-FILE-", file_types=[("PDF", "*.pdf")], target="-PDF-FILE-", enable_events=True
+                            ),
+                        ],
+                    ],
+                    expand_x=True,
                 )
             ],
-            [sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True, default=True)],
-            [sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True)],
-            [sg.HSeparator()],
-            [sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True)],
-        ] + self._scanner_options
+            [
+                sg.Frame(
+                    "Mode",
+                    [
+                        [
+                            sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True, default=True),
+                            sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True),
+                            sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True),
+                        ],
+                    ],
+                    expand_x=True,
+                )
+            ],
+            [
+                sg.Frame(
+                    "Signatures",
+                    [
+                        [
+                            sg.Text("Folder:"),
+                            sg.Text("No signature folder selected", auto_size_text=False, expand_x=True),
+                            sg.FolderBrowse("Browse", key="-SIGNATURE-BROWSE-", enable_events=True),
+                        ],
+                        [
+                            sg.Combo(
+                                list(self._loaded_signatures.keys()),
+                                default_value=list(self._loaded_signatures.keys())[0],
+                                key="-DROPDOWN-",
+                                enable_events=True,
+                                readonly=True,
+                            )
+                        ],
+                    ],
+                    expand_x=True,
+                )
+            ],
+        ] + [[sg.Frame("Scanner options", self._scanner_options, expand_x=True)]]
 
         col_right = [
             [sg.Button("Save pdf...", key="-SAVE-", disabled=True)],
@@ -209,6 +243,8 @@ class FalsiSignPy:
     def _on_graph_move(self, values: Dict[str, Any]) -> None:
         if not values["-PLACE-"]:
             return
+        if self._pdf is None or not self._pdf.loaded:
+            return
 
         cursor_xy = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_xy)
@@ -318,7 +354,7 @@ class FalsiSignPy:
         self._navigate_page(1)
 
     def _on_input_file_selected(self, values: Dict[str, Any]) -> None:
-        input_file = values["-INPUT-"]
+        input_file = values["-PDF-FILE-"]
         if not input_file:
             return
         filename = pl.Path(input_file)
@@ -326,6 +362,8 @@ class FalsiSignPy:
         self._current_page = 0
         current_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
         self._update_page(current_page_image)
+        self._window["-PDF-FILE-TEXT-"].update(filename.name)
+        self._window["-PDF-FILE-TEXT-"].set_tooltip(str(filename))
         self._set_disabled("-SAVE-", disabled=False)
         self._set_disabled(self._scanner_options, True)
 
@@ -373,7 +411,7 @@ class FalsiSignPy:
         self._event_handlers["-SAVE-"] = self._on_save_clicked
         self._event_handlers["-PREVIOUS-"] = self._on_previous_page_clicked
         self._event_handlers["-NEXT-"] = self._on_next_page_clicked
-        self._event_handlers["-INPUT-"] = self._on_input_file_selected
+        self._event_handlers["-PDF-FILE-"] = self._on_input_file_selected
         self._event_handlers["-CONFIGURE-"] = self._on_window_resized
 
         self._set_disabled(self._scanner_options, True)
