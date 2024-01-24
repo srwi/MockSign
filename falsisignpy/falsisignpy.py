@@ -2,7 +2,7 @@ import ctypes
 import pathlib as pl
 import platform
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import PySimpleGUI as sg
 import scanner
@@ -11,7 +11,7 @@ from pdf import PDF
 from PIL import Image
 from signature import Signature
 
-SIGNATURES_FOLDER = pl.Path(__file__).parent / "signatures"
+DEFAULT_SIGNATURE_FOLDER = pl.Path(__file__).parent / "signatures"
 
 
 class Mode(Enum):
@@ -26,7 +26,7 @@ class FalsiSignPy:
         self._current_page: int = 0
         self._floating_signature_figure_id: Optional[int] = None
         self._selected_signature_image = None
-        self._loaded_signatures = None
+        self._loaded_signatures: Dict[str, Image] = {}
         self._signature_zoom_level = 1.0
         self._scaling_factor = 1.0
         self._window: Optional[sg.Window] = None
@@ -43,6 +43,14 @@ class FalsiSignPy:
         ]
 
     def _create_window(self) -> sg.Window:
+        self._mode_options = [
+            [
+                sg.Radio("Place signature", key="-PLACE-", group_id=0, enable_events=True, default=True),
+                sg.Radio("Remove signature", key="-REMOVE-", group_id=0, enable_events=True),
+                sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True),
+            ],
+        ]
+
         self._scanner_options = [
             [sg.Checkbox("Remove signature background", key="-REMOVE-BG-", enable_events=True, default=True)],
         ] + [
@@ -53,6 +61,7 @@ class FalsiSignPy:
                     default=filter_.enabled,
                     enable_events=True,
                 ),
+                sg.Stretch(),
                 sg.Slider(
                     range=filter_.strength_range,
                     resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 100,
@@ -60,11 +69,38 @@ class FalsiSignPy:
                     key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-",
                     default_value=filter_.strength,
                     enable_events=True,
+                    disable_number_display=True,
                 )
                 if filter_.strength_range is not None
                 else sg.Text(),
             ]
             for filter_ in self._filters
+        ]
+
+        self._signature_options = [
+            [
+                sg.Text("Selected signature:"),
+                sg.Combo([], key="-DROPDOWN-", enable_events=True, readonly=True, expand_x=True),
+                sg.FolderBrowse("Browse", key="-SIGNATURE-BROWSE-", target="-SIGNATURE-BROWSE-", enable_events=True),
+            ],
+            [
+                sg.Frame(
+                    "",
+                    [
+                        [
+                            sg.Image(
+                                key="-SIGNATURE-IMAGE-",
+                                size=(300, 70),
+                                pad=(0, 0),
+                                expand_x=True,
+                                expand_y=True,
+                            )
+                        ]
+                    ],
+                    relief=sg.RELIEF_SUNKEN,
+                    pad=(0, 20),
+                )
+            ],
         ]
 
         col_left = [
@@ -74,64 +110,45 @@ class FalsiSignPy:
                     [
                         [
                             sg.Text("File:"),
-                            sg.Text(
-                                "No file loaded",
-                                auto_size_text=False,
-                                expand_x=True,
-                                key="-PDF-FILE-TEXT-",
-                            ),
+                            sg.Text("No file loaded", auto_size_text=False, expand_x=True, key="-PDF-FILE-TEXT-"),
                             sg.FileBrowse(
                                 key="-PDF-FILE-", file_types=[("PDF", "*.pdf")], target="-PDF-FILE-", enable_events=True
                             ),
                         ],
                     ],
                     expand_x=True,
+                    pad=10,
                 )
             ],
             [
                 sg.Frame(
                     "Mode",
-                    [
-                        [
-                            sg.Radio("Place", key="-PLACE-", group_id=0, enable_events=True, default=True),
-                            sg.Radio("Remove", key="-REMOVE-", group_id=0, enable_events=True),
-                            sg.Radio("Preview", key="-PREVIEW-", group_id=0, enable_events=True),
-                        ],
-                    ],
+                    self._mode_options,
                     expand_x=True,
+                    pad=10,
                 )
             ],
             [
                 sg.Frame(
                     "Signatures",
-                    [
-                        [
-                            sg.Text("Folder:"),
-                            sg.Text("No signature folder selected", auto_size_text=False, expand_x=True),
-                            sg.FolderBrowse("Browse", key="-SIGNATURE-BROWSE-", enable_events=True),
-                        ],
-                        [
-                            sg.Combo(
-                                list(self._loaded_signatures.keys()),
-                                default_value=list(self._loaded_signatures.keys())[0],
-                                key="-DROPDOWN-",
-                                enable_events=True,
-                                readonly=True,
-                            )
-                        ],
-                    ],
+                    self._signature_options,
+                    element_justification="center",
                     expand_x=True,
+                    pad=10,
                 )
             ],
-        ] + [[sg.Frame("Scanner options", self._scanner_options, expand_x=True)]]
+            [
+                sg.Frame(
+                    "Scanner options",
+                    self._scanner_options,
+                    expand_x=True,
+                    pad=10,
+                ),
+            ],
+            [sg.Button("Save pdf...", key="-SAVE-", disabled=True)],
+        ]
 
         col_right = [
-            [sg.Button("Save pdf...", key="-SAVE-", disabled=True)],
-            [
-                sg.Button("<", key="-PREVIOUS-", disabled=True),
-                sg.Text("No file loaded", key="-CURRENT-PAGE-"),
-                sg.Button(">", key="-NEXT-", disabled=True),
-            ],
             [
                 sg.Graph(
                     canvas_size=(400, 400),
@@ -145,43 +162,59 @@ class FalsiSignPy:
                     motion_events=True,
                 )
             ],
+            [
+                sg.Button("<", key="-PREVIOUS-", disabled=True),
+                sg.Text("No file loaded", key="-CURRENT-PAGE-"),
+                sg.Button(">", key="-NEXT-", disabled=True),
+            ],
         ]
 
         layout = [
-            [sg.Col(col_left), sg.Col(col_right, expand_y=True, expand_x=True)],
+            [
+                sg.Col(col_left, element_justification="center"),
+                sg.Col(col_right, element_justification="center", expand_y=True, expand_x=True),
+            ],
         ]
 
         return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
 
-    def _set_disabled(self, element: Any, disabled: bool) -> None:
+    def _set_disabled(self, element: Union[sg.Element, List], disabled: bool) -> None:
+        return  # TODO: Decide if this is needed
+
         if isinstance(element, list):
             for element in element:
                 self._set_disabled(element, disabled)
-        elif getattr(element, "Disabled", None) is not None:
-            if isinstance(element, sg.Slider):
-                element.Widget.config(troughcolor="#6D7F93" if disabled else sg.theme_slider_color())
-                element.Widget.config(foreground="grey43" if disabled else sg.theme_text_color())
-                element.update(disabled=disabled)
-            elif isinstance(element, sg.Combo):
-                element.Widget.config(background="red" if disabled else sg.theme_input_background_color())
-                element.Widget.config(foreground="grey43" if disabled else sg.theme_input_text_color())
-                element.update(disabled=disabled)
-            elif isinstance(element, sg.Element):
-                element.update(disabled=disabled)
 
-    @staticmethod
-    def _load_signatures_or_fail(path: pl.Path) -> Dict[str, Image.Image]:
+        if isinstance(element, sg.Slider):
+            element.Widget.config(troughcolor="#6D7F93" if disabled else sg.theme_slider_color())
+        elif isinstance(element, sg.Text):
+            element.update(text_color="grey43" if disabled else sg.theme_text_color())
+
+        if isinstance(element, sg.Element) and getattr(element, "Disabled", None) is not None:
+            element.update(disabled=disabled)
+
+    def _load_signatures(self, values: Dict[str, Any]) -> None:
+        path = values["-SIGNATURE-BROWSE-"]
+        if not path:
+            return
+        path = pl.Path(path)
+
         signatures = {}
         for file in path.glob("*"):
-            signatures[file.name] = Image.open(file)
+            try:
+                signatures[file.name] = Image.open(file)
+            except OSError:
+                pass
+
         if len(signatures) == 0:
-            sg.popup_error(
-                f"No signatures found. Place some signatures inside of "
-                f"the '{SIGNATURES_FOLDER}' folder and restart FalsiSignPy.",
+            sg.popup_notify(
+                "No signatures found. Please select a folder containing signature images.",
                 title="No signatures found",
             )
-            exit(1)
-        return signatures
+            return
+
+        self._window["-DROPDOWN-"].update(values=list(signatures.keys()))
+        self._loaded_signatures = signatures
 
     def _place_floating_signature(self, signature_image: Image.Image, cursor_xy: Tuple[int, int]) -> None:
         new_size = (
@@ -266,11 +299,17 @@ class FalsiSignPy:
     def _set_mode(self, mode: Mode) -> None:
         self._mode = mode
         self._set_disabled(self._scanner_options, mode == Mode.EDIT)
-        self._set_disabled(self._window["-DROPDOWN-"], mode == Mode.PREVIEW)
+        self._set_disabled(self._signature_options, mode == Mode.PREVIEW)
         self._update_current_page()
 
     def _on_signature_selected(self, values: Dict[str, Any]) -> None:
         self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
+        signature_frame_size = self._window["-SIGNATURE-IMAGE-"].get_size()
+        self._window["-SIGNATURE-IMAGE-"].update(
+            data=utils.image_to_bytes(
+                utils.resize_and_pad_image(self._selected_signature_image, target_size=signature_frame_size)
+            )
+        )
         self._set_mode(Mode.EDIT)
 
     def _on_remove_selected(self, _: Dict[str, Any]) -> None:
@@ -364,7 +403,8 @@ class FalsiSignPy:
         self._update_page(current_page_image)
         self._window["-PDF-FILE-TEXT-"].update(filename.name)
         self._window["-PDF-FILE-TEXT-"].set_tooltip(str(filename))
-        self._set_disabled("-SAVE-", disabled=False)
+        self._set_disabled(self._window["-SAVE-"], False)
+        self._set_disabled(self._mode_options, False)
         self._set_disabled(self._scanner_options, True)
 
     def _on_window_resized(self, _: Dict[str, Any]) -> None:
@@ -389,7 +429,6 @@ class FalsiSignPy:
 
     def start(self) -> None:
         self._running = True
-        self._loaded_signatures = self._load_signatures_or_fail(SIGNATURES_FOLDER)
 
         self._window: sg.Window = self._create_window()
         self._window.bind("<Configure>", "-CONFIGURE-")
@@ -412,8 +451,11 @@ class FalsiSignPy:
         self._event_handlers["-PREVIOUS-"] = self._on_previous_page_clicked
         self._event_handlers["-NEXT-"] = self._on_next_page_clicked
         self._event_handlers["-PDF-FILE-"] = self._on_input_file_selected
+        self._event_handlers["-SIGNATURE-BROWSE-"] = self._load_signatures
         self._event_handlers["-CONFIGURE-"] = self._on_window_resized
 
+        self._set_disabled(self._mode_options, True)
+        self._set_disabled(self._signature_options, True)
         self._set_disabled(self._scanner_options, True)
 
         for filter_ in self._filters:
