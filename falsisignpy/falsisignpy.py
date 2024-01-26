@@ -1,8 +1,9 @@
 import ctypes
+import os
 import pathlib as pl
 import platform
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import PySimpleGUI as sg
 import scanner
@@ -10,8 +11,6 @@ import utils
 from pdf import PDF
 from PIL import Image
 from signature import Signature
-
-DEFAULT_SIGNATURE_FOLDER = pl.Path(__file__).parent / "signatures"
 
 
 class Mode(Enum):
@@ -21,19 +20,20 @@ class Mode(Enum):
 
 class FalsiSignPy:
     def __init__(self) -> None:
-        self._running = False
+        self._running: bool = False
+        self._window: Optional[sg.Window] = None
+        self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
+        self._graph: Optional[sg.Graph] = None
+
         self._current_page_figure_id: Optional[int] = None
         self._current_page: int = 0
         self._floating_signature_figure_id: Optional[int] = None
-        self._selected_signature_image = None
+        self._selected_signature_image: Image = None
         self._loaded_signatures: Dict[str, Image] = {}
-        self._signature_zoom_level = 1.0
-        self._scaling_factor = 1.0
-        self._window: Optional[sg.Window] = None
-        self._graph: Optional[sg.Graph] = None
+        self._signature_zoom_level: float = 1.0
+        self._scaling_factor: float = 1.0
         self._pdf: Optional[PDF] = None
         self._mode: Mode = Mode.EDIT
-        self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
         self._filters = [
             scanner.Grayscale("Grayscale", enabled=True),
@@ -43,7 +43,7 @@ class FalsiSignPy:
         ]
 
     def _create_window(self) -> sg.Window:
-        self._mode_options = [
+        mode_options = [
             [
                 sg.Radio("Place signature", key="-PLACE-", group_id=0, enable_events=True, default=True),
                 sg.Radio("Remove signature", key="-REMOVE-", group_id=0, enable_events=True),
@@ -51,33 +51,7 @@ class FalsiSignPy:
             ],
         ]
 
-        self._scanner_options = [
-            [sg.Checkbox("Remove signature background", key="-REMOVE-BG-", enable_events=True, default=True)],
-        ] + [
-            [
-                sg.Checkbox(
-                    filter_.name,
-                    key=f"-{filter_.__class__.__name__.upper()}-",
-                    default=filter_.enabled,
-                    enable_events=True,
-                ),
-                sg.Stretch(),
-                sg.Slider(
-                    range=filter_.strength_range,
-                    resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 100,
-                    orientation="horizontal",
-                    key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-",
-                    default_value=filter_.strength,
-                    enable_events=True,
-                    disable_number_display=True,
-                )
-                if filter_.strength_range is not None
-                else sg.Text(),
-            ]
-            for filter_ in self._filters
-        ]
-
-        self._signature_options = [
+        signature_options = [
             [
                 sg.Text("Selected signature:"),
                 sg.Combo([], key="-DROPDOWN-", enable_events=True, readonly=True, expand_x=True),
@@ -103,6 +77,32 @@ class FalsiSignPy:
             ],
         ]
 
+        scanner_options = [
+            [sg.Checkbox("Remove signature background", key="-REMOVE-BG-", enable_events=True, default=True)],
+        ] + [
+            [
+                sg.Checkbox(
+                    filter_.name,
+                    key=f"-{filter_.__class__.__name__.upper()}-",
+                    default=filter_.enabled,
+                    enable_events=True,
+                ),
+                sg.Stretch(),
+                sg.Slider(
+                    range=filter_.strength_range,
+                    resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 100,
+                    orientation="horizontal",
+                    key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-",
+                    default_value=filter_.strength,
+                    enable_events=True,
+                    disable_number_display=True,
+                )
+                if filter_.strength_range is not None
+                else sg.Text(),
+            ]
+            for filter_ in self._filters
+        ]
+
         col_left = [
             [
                 sg.Frame(
@@ -123,7 +123,7 @@ class FalsiSignPy:
             [
                 sg.Frame(
                     "Mode",
-                    self._mode_options,
+                    mode_options,
                     expand_x=True,
                     pad=10,
                 )
@@ -131,7 +131,7 @@ class FalsiSignPy:
             [
                 sg.Frame(
                     "Signatures",
-                    self._signature_options,
+                    signature_options,
                     element_justification="center",
                     expand_x=True,
                     pad=10,
@@ -140,7 +140,7 @@ class FalsiSignPy:
             [
                 sg.Frame(
                     "Scanner options",
-                    self._scanner_options,
+                    scanner_options,
                     expand_x=True,
                     pad=10,
                 ),
@@ -178,29 +178,13 @@ class FalsiSignPy:
 
         return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
 
-    def _set_disabled(self, element: Union[sg.Element, List], disabled: bool) -> None:
-        return  # TODO: Decide if this is needed
-
-        if isinstance(element, list):
-            for element in element:
-                self._set_disabled(element, disabled)
-
-        if isinstance(element, sg.Slider):
-            element.Widget.config(troughcolor="#6D7F93" if disabled else sg.theme_slider_color())
-        elif isinstance(element, sg.Text):
-            element.update(text_color="grey43" if disabled else sg.theme_text_color())
-
-        if isinstance(element, sg.Element) and getattr(element, "Disabled", None) is not None:
-            element.update(disabled=disabled)
-
     def _load_signatures(self, values: Dict[str, Any]) -> None:
         path = values["-SIGNATURE-BROWSE-"]
         if not path:
             return
-        path = pl.Path(path)
 
         signatures = {}
-        for file in path.glob("*"):
+        for file in pl.Path(path).glob("*"):
             try:
                 signatures[file.name] = Image.open(file)
             except OSError:
@@ -273,33 +257,30 @@ class FalsiSignPy:
         current_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
         self._update_page(current_page_image)
 
-    def _on_graph_move(self, values: Dict[str, Any]) -> None:
+    def _on_graph_mouse_move(self, values: Dict[str, Any]) -> None:
         if not values["-PLACE-"]:
             return
-        if self._pdf is None or not self._pdf.loaded:
-            return
 
-        cursor_xy = values["-GRAPH-"]
-        self._place_floating_signature(self._selected_signature_image, cursor_xy)
+        if self._selected_signature_image:
+            cursor_xy = values["-GRAPH-"]
+            self._place_floating_signature(self._selected_signature_image, cursor_xy)
 
     def _on_graph_leave(self, _: Dict[str, Any]) -> None:
         if self._floating_signature_figure_id is not None:
             self._graph.delete_figure(self._floating_signature_figure_id)
 
     def _on_graph_mouse_wheel(self, values: Dict[str, Any]) -> None:
-        if not values["-PLACE-"]:
+        if not values["-PLACE-"] or not self._floating_signature_figure_id:
             return
 
-        mouse_wheel_up = self._graph.user_bind_event.delta > 0
-        self._signature_zoom_level *= 1.1 if mouse_wheel_up else 0.9
+        is_mouse_wheel_up = self._graph.user_bind_event.delta > 0
+        self._signature_zoom_level += 0.1 if is_mouse_wheel_up else -0.1
 
         cursor_xy = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_xy)
 
     def _set_mode(self, mode: Mode) -> None:
         self._mode = mode
-        self._set_disabled(self._scanner_options, mode == Mode.EDIT)
-        self._set_disabled(self._signature_options, mode == Mode.PREVIEW)
         self._update_current_page()
 
     def _on_signature_selected(self, values: Dict[str, Any]) -> None:
@@ -311,12 +292,6 @@ class FalsiSignPy:
             )
         )
         self._set_mode(Mode.EDIT)
-
-    def _on_remove_selected(self, _: Dict[str, Any]) -> None:
-        self._set_mode(Mode.EDIT)
-
-    def _on_preview_selected(self, _: Dict[str, Any]) -> None:
-        self._set_mode(Mode.PREVIEW)
 
     def _on_graph_clicked(self, values: Dict[str, Any]) -> None:
         cursor_xy = values["-GRAPH-"]
@@ -403,9 +378,7 @@ class FalsiSignPy:
         self._update_page(current_page_image)
         self._window["-PDF-FILE-TEXT-"].update(filename.name)
         self._window["-PDF-FILE-TEXT-"].set_tooltip(str(filename))
-        self._set_disabled(self._window["-SAVE-"], False)
-        self._set_disabled(self._mode_options, False)
-        self._set_disabled(self._scanner_options, True)
+        self._window["-SAVE-"].update(disabled=False)
 
     def _on_window_resized(self, _: Dict[str, Any]) -> None:
         if self._pdf is not None and self._pdf.loaded:
@@ -415,16 +388,17 @@ class FalsiSignPy:
     def _on_win_closed(self, _: Dict[str, Any]) -> None:
         self._running = False
 
-    def _set_filter_enabled(self, event: Dict[str, Any], filter_: scanner.Filter, key: str) -> None:
-        filter_.set_enabled(event[key])
+    def _set_filter_enabled(self, filter_: scanner.Filter, value: bool) -> None:
+        filter_.set_enabled(value)
         self._update_current_page()
 
-    def _set_filter_strength(self, event: Dict[str, Any], filter_: scanner.Filter, key: str) -> None:
-        filter_.set_strength(event[key])
+    def _set_filter_strength(self, filter_: scanner.Filter, value: float) -> None:
+        filter_.set_strength(value)
         self._update_current_page()
 
     def _set_remove_background(self, event: Dict[str, Any]) -> None:
-        self._pdf.set_remove_signature_background(event["-REMOVE-BG-"])
+        if self._pdf and self._pdf.loaded:
+            self._pdf.set_remove_signature_background(event["-REMOVE-BG-"])
         self._update_current_page()
 
     def start(self) -> None:
@@ -438,15 +412,15 @@ class FalsiSignPy:
         self._graph.bind("<MouseWheel>", "+WHEEL")
 
         self._event_handlers[sg.WIN_CLOSED] = self._on_win_closed
-        self._event_handlers["-GRAPH-+MOVE"] = self._on_graph_move
+        self._event_handlers["-GRAPH-+MOVE"] = self._on_graph_mouse_move
         self._event_handlers["-GRAPH-+LEAVE"] = self._on_graph_leave
         self._event_handlers["-GRAPH-+WHEEL"] = self._on_graph_mouse_wheel
         self._event_handlers["-GRAPH-"] = self._on_graph_clicked
         self._event_handlers["-DROPDOWN-"] = self._on_signature_selected
         self._event_handlers["-REMOVE-BG-"] = self._set_remove_background
-        self._event_handlers["-PLACE-"] = self._on_signature_selected
-        self._event_handlers["-REMOVE-"] = self._on_remove_selected
-        self._event_handlers["-PREVIEW-"] = self._on_preview_selected
+        self._event_handlers["-PLACE-"] = lambda _: self._set_mode(Mode.EDIT)
+        self._event_handlers["-REMOVE-"] = lambda _: self._set_mode(Mode.EDIT)
+        self._event_handlers["-PREVIEW-"] = lambda _: self._set_mode(Mode.PREVIEW)
         self._event_handlers["-SAVE-"] = self._on_save_clicked
         self._event_handlers["-PREVIOUS-"] = self._on_previous_page_clicked
         self._event_handlers["-NEXT-"] = self._on_next_page_clicked
@@ -454,16 +428,12 @@ class FalsiSignPy:
         self._event_handlers["-SIGNATURE-BROWSE-"] = self._load_signatures
         self._event_handlers["-CONFIGURE-"] = self._on_window_resized
 
-        self._set_disabled(self._mode_options, True)
-        self._set_disabled(self._signature_options, True)
-        self._set_disabled(self._scanner_options, True)
-
         for filter_ in self._filters:
             key = filter_.__class__.__name__.upper()
-            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: self._set_filter_enabled(e, f, f"-{k}-")
+            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: self._set_filter_enabled(f, e[f"-{k}-"])
             if filter_.strength_range is not None:
                 self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: self._set_filter_strength(
-                    e, f, f"-{k}-STRENGTH-"
+                    f, e[f"-{k}-STRENGTH-"]
                 )
 
         while self._running:
@@ -475,7 +445,7 @@ class FalsiSignPy:
 
 
 if __name__ == "__main__":
-    if int(platform.release()) >= 8:
+    if os.name == "nt" and int(platform.release()) >= 8:
         ctypes.windll.shcore.SetProcessDpiAwareness(True)
 
     app = FalsiSignPy()

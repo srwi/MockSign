@@ -38,7 +38,7 @@ class Filter(abc.ABC):
     def strength(self) -> Optional[float]:
         return self._strength
 
-    def set_strength(self, value: bool) -> None:
+    def set_strength(self, value: float) -> None:
         self._strength = value
 
     @abc.abstractmethod
