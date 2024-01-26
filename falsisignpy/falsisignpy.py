@@ -211,14 +211,13 @@ class FalsiSignPy:
     def _on_signature_selected(self, values: Dict[str, Any]) -> None:
         selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
         self._select_signature(selected_signature_image)
-        self._set_mode(Mode.EDIT)
 
     def _place_floating_signature(self, signature_image: Image.Image, cursor_xy: Tuple[int, int]) -> None:
-        new_size = (
+        size = (
             int(signature_image.width * self._signature_zoom_level / self._scaling_factor),
             int(signature_image.height * self._signature_zoom_level / self._scaling_factor),
         )
-        scaled_signature_image = signature_image.copy().resize(new_size)
+        scaled_signature_image = signature_image.copy().resize(size)
         scaled_signature_bytes = utils.image_to_bytes(scaled_signature_image)
 
         placed_figure: int = self._graph.draw_image(data=scaled_signature_bytes, location=cursor_xy)
@@ -235,6 +234,7 @@ class FalsiSignPy:
 
     def _update_page(self, page_image: Image.Image) -> None:
         new_page_image = page_image.copy()
+
         if self._mode == Mode.PREVIEW:
             for filter_ in self._filters:
                 new_page_image = filter_.apply(new_page_image)
@@ -242,7 +242,9 @@ class FalsiSignPy:
         # Match document coordinate system
         graph_size = self._graph.get_size()
         self._graph.CanvasSize = graph_size  # https://github.com/PySimpleGUI/PySimpleGUI/issues/6451
-        _, _, _, _, self._scaling_factor = utils.calculate_padded_image_coordinates(new_page_image.size, graph_size)
+        _, _, _, _, self._scaling_factor = utils.calculate_padded_image_coordinates(
+            new_page_image.size, graph_size
+        )  # TODO: turn into class
         h_offset = ((graph_size[0] * self._scaling_factor) - new_page_image.width) / 2
         v_offset = ((graph_size[1] * self._scaling_factor) - new_page_image.height) / 2
         self._graph.change_coordinates(
@@ -262,76 +264,6 @@ class FalsiSignPy:
 
         if self._mode == Mode.EDIT:
             self._redraw_page_signatures()
-
-    def _update_current_page(self) -> None:
-        if self._pdf is None or not self._pdf.loaded:
-            return
-
-        current_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
-        self._update_page(current_page_image)
-
-    def _on_graph_mouse_move(self, values: Dict[str, Any]) -> None:
-        if not values["-PLACE-"]:
-            return
-
-        if self._selected_signature_image:
-            cursor_xy = values["-GRAPH-"]
-            self._place_floating_signature(self._selected_signature_image, cursor_xy)
-
-    def _on_graph_leave(self, _: Dict[str, Any]) -> None:
-        if self._floating_signature_figure_id is not None:
-            self._graph.delete_figure(self._floating_signature_figure_id)
-
-    def _on_graph_mouse_wheel(self, values: Dict[str, Any]) -> None:
-        if not values["-PLACE-"] or not self._floating_signature_figure_id:
-            return
-
-        is_mouse_wheel_up = self._graph.user_bind_event.delta > 0
-        self._signature_zoom_level *= 1.1 if is_mouse_wheel_up else 0.9
-
-        cursor_xy = values["-GRAPH-"]
-        self._place_floating_signature(self._selected_signature_image, cursor_xy)
-
-    def _set_mode(self, mode: Mode) -> None:
-        self._mode = mode
-        self._update_current_page()
-
-    def _on_graph_clicked(self, values: Dict[str, Any]) -> None:
-        cursor_xy = values["-GRAPH-"]
-        if values["-REMOVE-"]:
-            figure_ids_at_location = self._graph.get_figures_at_location(cursor_xy)
-            for id_ in reversed(figure_ids_at_location):
-                if id_ == self._current_page_figure_id:
-                    continue
-                self._graph.delete_figure(id_)
-                self._pdf.delete_signature(id_)
-                break  # Delete only a single signature at a time
-        elif values["-PLACE-"]:
-            if not self._pdf:
-                print("Please load a PDF file before placing signatures.")
-                return
-            if self._floating_signature_figure_id is None:
-                return
-            placed_signature = Signature(
-                image=self._selected_signature_image,
-                location=cursor_xy,
-                scale=self._signature_zoom_level,
-            )
-            self._pdf.place_signature(
-                signature=placed_signature,
-                identifier=self._floating_signature_figure_id,
-                page_number=self._current_page,
-            )
-            self._floating_signature_figure_id = None  # Anchor floating signature
-
-    def _on_save_clicked(self, _: Dict[str, Any]) -> None:
-        if self._pdf is None or not self._pdf.loaded:
-            print("Please load a PDF file before saving.")
-            return
-
-        filename = sg.popup_get_file("Save pdf...", save_as=True)
-        if filename:
-            self._pdf.save(path=pl.Path(filename), filters=self._filters)
 
     def _redraw_page_signatures(self) -> None:
         page_signatures = self._pdf.get_page_signatures(self._current_page)
@@ -353,6 +285,85 @@ class FalsiSignPy:
                 page_number=self._current_page,
             )
 
+    def _update_current_page(self) -> None:
+        if self._pdf is None or not self._pdf.loaded:
+            return
+
+        current_page_image = self._pdf.get_page_image(
+            page_number=self._current_page,
+            signed=self._mode == Mode.PREVIEW,
+        )
+        self._update_page(current_page_image)
+
+    def _on_graph_mouse_move(self, values: Dict[str, Any]) -> None:
+        if not values["-PLACE-"]:
+            return
+
+        if self._selected_signature_image:
+            cursor_xy = values["-GRAPH-"]
+            self._place_floating_signature(self._selected_signature_image, cursor_xy)
+
+    def _on_graph_leave(self, _: Dict[str, Any]) -> None:
+        if self._floating_signature_figure_id is not None:
+            self._graph.delete_figure(self._floating_signature_figure_id)
+
+    def _on_graph_mouse_wheel(self, values: Dict[str, Any]) -> None:
+        if not values["-PLACE-"] or not self._selected_signature_image:
+            return
+
+        is_mouse_wheel_up = self._graph.user_bind_event.delta > 0
+        self._signature_zoom_level *= 1.1 if is_mouse_wheel_up else 0.9
+
+        cursor_xy = values["-GRAPH-"]
+        self._place_floating_signature(self._selected_signature_image, cursor_xy)
+
+    def _on_graph_clicked(self, values: Dict[str, Any]) -> None:
+        cursor_xy = values["-GRAPH-"]
+        if values["-REMOVE-"]:
+            figure_ids_at_location = self._graph.get_figures_at_location(cursor_xy)
+            for figure_id in reversed(figure_ids_at_location):
+                if figure_id == self._current_page_figure_id:
+                    continue
+                self._graph.delete_figure(figure_id)
+                self._pdf.delete_signature(figure_id)
+                break  # Delete only a single signature at a time
+        elif values["-PLACE-"]:
+            if not self._pdf:
+                sg.popup_notify(
+                    "Please load a PDF file before placing signatures.",
+                    title="No PDF file loaded",
+                )
+                return
+            if self._floating_signature_figure_id is None or not self._selected_signature_image:
+                return
+            placed_signature = Signature(
+                image=self._selected_signature_image,
+                location=cursor_xy,
+                scale=self._signature_zoom_level,
+            )
+            self._pdf.place_signature(
+                signature=placed_signature,
+                identifier=self._floating_signature_figure_id,
+                page_number=self._current_page,
+            )
+            self._floating_signature_figure_id = None  # Anchor floating signature
+
+    def _set_mode(self, mode: Mode) -> None:
+        self._mode = mode
+        self._update_current_page()
+
+    def _on_save_clicked(self, _: Dict[str, Any]) -> None:
+        if self._pdf is None or not self._pdf.loaded:
+            sg.popup_notify(
+                "Please load a PDF file before saving.",
+                title="No PDF file loaded",
+            )
+            return
+
+        filename = sg.popup_get_file("Save pdf...", save_as=True)
+        if filename:
+            self._pdf.save(path=pl.Path(filename), filters=self._filters)
+
     def _navigate_page(self, delta: int) -> None:
         new_page_number = self._current_page + delta
         if new_page_number < 0 or new_page_number >= self._pdf.num_pages:
@@ -363,12 +374,6 @@ class FalsiSignPy:
         self._current_page = new_page_number
         new_page_image = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
         self._update_page(new_page_image)
-
-    def _on_previous_page_clicked(self, _: Dict[str, Any]) -> None:
-        self._navigate_page(-1)
-
-    def _on_next_page_clicked(self, _: Dict[str, Any]) -> None:
-        self._navigate_page(1)
 
     def _on_input_file_selected(self, values: Dict[str, Any]) -> None:
         input_file = values["-PDF-FILE-"]
@@ -388,9 +393,6 @@ class FalsiSignPy:
             current_page = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
             self._update_page(current_page)
 
-    def _on_win_closed(self, _: Dict[str, Any]) -> None:
-        self._running = False
-
     def _set_filter_enabled(self, filter_: scanner.Filter, value: bool) -> None:
         filter_.set_enabled(value)
         self._update_current_page()
@@ -400,9 +402,12 @@ class FalsiSignPy:
         self._update_current_page()
 
     def _set_remove_background(self, event: Dict[str, Any]) -> None:
-        if self._pdf and self._pdf.loaded:
+        if self._pdf:
             self._pdf.set_remove_signature_background(event["-REMOVE-BG-"])
         self._update_current_page()
+
+    def _on_win_closed(self, _: Dict[str, Any]) -> None:
+        self._running = False
 
     def start(self) -> None:
         self._running = True
@@ -424,9 +429,9 @@ class FalsiSignPy:
         self._event_handlers["-PLACE-"] = lambda _: self._set_mode(Mode.EDIT)
         self._event_handlers["-REMOVE-"] = lambda _: self._set_mode(Mode.EDIT)
         self._event_handlers["-PREVIEW-"] = lambda _: self._set_mode(Mode.PREVIEW)
+        self._event_handlers["-PREVIOUS-"] = lambda _: self._navigate_page(-1)
+        self._event_handlers["-NEXT-"] = lambda _: self._navigate_page(1)
         self._event_handlers["-SAVE-"] = self._on_save_clicked
-        self._event_handlers["-PREVIOUS-"] = self._on_previous_page_clicked
-        self._event_handlers["-NEXT-"] = self._on_next_page_clicked
         self._event_handlers["-PDF-FILE-"] = self._on_input_file_selected
         self._event_handlers["-SIGNATURE-BROWSE-"] = self._load_signatures
         self._event_handlers["-CONFIGURE-"] = self._on_window_resized
@@ -448,6 +453,7 @@ class FalsiSignPy:
 
 
 if __name__ == "__main__":
+    # Enable DPI awareness on Windows 8 and above
     if os.name == "nt" and int(platform.release()) >= 8:
         ctypes.windll.shcore.SetProcessDpiAwareness(True)
 
