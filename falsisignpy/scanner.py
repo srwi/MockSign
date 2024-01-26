@@ -60,15 +60,24 @@ class Grayscale(Filter):
 
 class AutoContrast(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
+        if self.strength is None:
+            return image
+
         return ImageOps.autocontrast(image, cutoff=int(self.strength))
 
 
 class Blur(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
-        return image.filter(ImageFilter.GaussianBlur(self._strength))
+        if self.strength is None:
+            return image
+
+        return image.filter(ImageFilter.GaussianBlur(self.strength))
 
 
 class Rotate(Filter):
     def _apply(self, image: Image.Image) -> Image.Image:
+        if self.strength is None:
+            return image
+
         random_strength = random.uniform(-float(self.strength), float(self.strength))
         return image.rotate(angle=random_strength, fillcolor="white", resample=Resampling.BILINEAR)

@@ -1,8 +1,7 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
-import utils
 from cv2 import seamlessClone
 from PIL import Image
 
@@ -10,10 +9,10 @@ from PIL import Image
 def seamless_clone(image: Image.Image, signature: Image.Image, location: Tuple[int, int]) -> Image.Image:
     x, y = location
     signature_width, signature_height = signature.size
-    signature = np.array(signature)
+    signature_array = np.array(signature)
     target_image = np.array(image)
 
-    cropped_signature = signature[
+    cropped_signature = signature_array[
         : min(signature_height, target_image.shape[0] - y), : min(signature_width, target_image.shape[1] - x)
     ]
     location_center = (x + cropped_signature.shape[1] // 2, y + cropped_signature.shape[0] // 2)
@@ -44,17 +43,12 @@ class Signature:
         self._scaled_image_cache: Optional[Image.Image] = None
         self._scaled_bytes_cache: Optional[bytes] = None
 
-    def get_scaled_signature(self, as_bytes: bool = False) -> Union[bytes, Image.Image]:
+    def get_scaled_signature(self) -> Image.Image:
         if self._scaled_image_cache is None:
             new_size = int(self._image.size[0] * self._scale), int(self._image.size[1] * self._scale)
             self._scaled_image_cache = self._image.copy().resize(size=new_size)
-        if not as_bytes:
-            return self._scaled_image_cache.copy()
 
-        if self._scaled_bytes_cache is None:
-            self._scaled_bytes_cache = utils.image_to_bytes(self._scaled_image_cache)
-
-        return self._scaled_bytes_cache
+        return self._scaled_image_cache.copy()
 
     def get_location(self) -> Tuple[int, int]:
         return self._location

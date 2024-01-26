@@ -22,14 +22,14 @@ class FalsiSignPy:
     def __init__(self) -> None:
         self._running: bool = False
         self._window: Optional[sg.Window] = None
-        self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
         self._graph: Optional[sg.Graph] = None
+        self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
         self._current_page_figure_id: Optional[int] = None
         self._current_page: int = 0
         self._floating_signature_figure_id: Optional[int] = None
-        self._selected_signature_image: Image = None
-        self._loaded_signatures: Dict[str, Image] = {}
+        self._selected_signature_image: Optional[Image.Image] = None
+        self._loaded_signatures: Dict[str, Image.Image] = {}
         self._signature_zoom_level: float = 1.0
         self._scaling_factor: float = 1.0
         self._pdf: Optional[PDF] = None
@@ -163,9 +163,9 @@ class FalsiSignPy:
                 )
             ],
             [
-                sg.Button("<", key="-PREVIOUS-", disabled=True),
-                sg.Text("No file loaded", key="-CURRENT-PAGE-"),
-                sg.Button(">", key="-NEXT-", disabled=True),
+                sg.Button("<", key="-PREVIOUS-"),
+                sg.Text("", key="-CURRENT-PAGE-"),
+                sg.Button(">", key="-NEXT-"),
             ],
         ]
 
@@ -202,7 +202,7 @@ class FalsiSignPy:
         self._select_signature(signatures[signature_filenames[0]])
         self._loaded_signatures = signatures
 
-    def _select_signature(self, signature: Image) -> None:
+    def _select_signature(self, signature: Image.Image) -> None:
         self._selected_signature_image = signature
         preview_size = self._window["-SIGNATURE-IMAGE-"].get_size()
         padded_preview = utils.resize_and_pad_image(image=signature, target_size=preview_size)
@@ -227,10 +227,15 @@ class FalsiSignPy:
         self._floating_signature_figure_id = placed_figure
 
     def _update_page_navigation(self) -> None:
-        description = f"Page {self._current_page + 1}/{self._pdf.num_pages}"
-        self._window["-CURRENT-PAGE-"].update(description)
-        self._window["-PREVIOUS-"].update(disabled=self._current_page == 0)
-        self._window["-NEXT-"].update(disabled=self._current_page == self._pdf.num_pages - 1)
+        if self._pdf and self._pdf.loaded:
+            description = f"Page {self._current_page + 1}/{self._pdf.num_pages}"
+            self._window["-CURRENT-PAGE-"].update(description)
+            self._window["-PREVIOUS-"].update(disabled=self._current_page == 0)
+            self._window["-NEXT-"].update(disabled=self._current_page == self._pdf.num_pages - 1)
+        else:
+            self._window["-CURRENT-PAGE-"].update("No file loaded")
+            self._window["-PREVIOUS-"].update(disabled=True)
+            self._window["-NEXT-"].update(disabled=True)
 
     def _update_page(self, page_image: Image.Image) -> None:
         new_page_image = page_image.copy()
@@ -242,9 +247,7 @@ class FalsiSignPy:
         # Match document coordinate system
         graph_size = self._graph.get_size()
         self._graph.CanvasSize = graph_size  # https://github.com/PySimpleGUI/PySimpleGUI/issues/6451
-        _, _, _, _, self._scaling_factor = utils.calculate_padded_image_coordinates(
-            new_page_image.size, graph_size
-        )  # TODO: turn into class
+        self._scaling_factor = utils.calculate_padded_image_coordinates(new_page_image.size, graph_size).scale
         h_offset = ((graph_size[0] * self._scaling_factor) - new_page_image.width) / 2
         v_offset = ((graph_size[1] * self._scaling_factor) - new_page_image.height) / 2
         self._graph.change_coordinates(
@@ -266,6 +269,9 @@ class FalsiSignPy:
             self._redraw_page_signatures()
 
     def _redraw_page_signatures(self) -> None:
+        if self._pdf is None or not self._pdf.loaded:
+            return
+
         page_signatures = self._pdf.get_page_signatures(self._current_page)
         self._pdf.clear_page_signatures(self._current_page)
         for signature in page_signatures:
@@ -365,6 +371,9 @@ class FalsiSignPy:
             self._pdf.save(path=pl.Path(filename), filters=self._filters)
 
     def _navigate_page(self, delta: int) -> None:
+        if self._pdf is None or not self._pdf.loaded:
+            return
+
         new_page_number = self._current_page + delta
         if new_page_number < 0 or new_page_number >= self._pdf.num_pages:
             return
@@ -406,7 +415,7 @@ class FalsiSignPy:
             self._pdf.set_remove_signature_background(event["-REMOVE-BG-"])
         self._update_current_page()
 
-    def _on_win_closed(self, _: Dict[str, Any]) -> None:
+    def _on_windown_closed(self, _: Dict[str, Any]) -> None:
         self._running = False
 
     def start(self) -> None:
@@ -419,11 +428,14 @@ class FalsiSignPy:
         self._graph.bind("<Leave>", "+LEAVE")
         self._graph.bind("<MouseWheel>", "+WHEEL")
 
-        self._event_handlers[sg.WIN_CLOSED] = self._on_win_closed
+        self._event_handlers[sg.WIN_CLOSED] = self._on_windown_closed
+        self._event_handlers["-CONFIGURE-"] = self._on_window_resized
         self._event_handlers["-GRAPH-+MOVE"] = self._on_graph_mouse_move
         self._event_handlers["-GRAPH-+LEAVE"] = self._on_graph_leave
         self._event_handlers["-GRAPH-+WHEEL"] = self._on_graph_mouse_wheel
         self._event_handlers["-GRAPH-"] = self._on_graph_clicked
+        self._event_handlers["-PDF-FILE-"] = self._on_input_file_selected
+        self._event_handlers["-SIGNATURE-BROWSE-"] = self._load_signatures
         self._event_handlers["-DROPDOWN-"] = self._on_signature_selected
         self._event_handlers["-REMOVE-BG-"] = self._set_remove_background
         self._event_handlers["-PLACE-"] = lambda _: self._set_mode(Mode.EDIT)
@@ -432,9 +444,6 @@ class FalsiSignPy:
         self._event_handlers["-PREVIOUS-"] = lambda _: self._navigate_page(-1)
         self._event_handlers["-NEXT-"] = lambda _: self._navigate_page(1)
         self._event_handlers["-SAVE-"] = self._on_save_clicked
-        self._event_handlers["-PDF-FILE-"] = self._on_input_file_selected
-        self._event_handlers["-SIGNATURE-BROWSE-"] = self._load_signatures
-        self._event_handlers["-CONFIGURE-"] = self._on_window_resized
 
         for filter_ in self._filters:
             key = filter_.__class__.__name__.upper()
@@ -443,6 +452,8 @@ class FalsiSignPy:
                 self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: self._set_filter_strength(
                     f, e[f"-{k}-STRENGTH-"]
                 )
+
+        self._update_page_navigation()
 
         while self._running:
             event, values = self._window.read()

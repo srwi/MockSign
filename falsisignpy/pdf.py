@@ -9,7 +9,7 @@ from signature import Signature
 
 class PDF:
     def __init__(self, path: pl.Path, remove_signature_background: bool) -> None:
-        self._pages: List[Image] = []
+        self._pages: List[Image.Image] = []
         self._remove_signature_background = remove_signature_background
 
         document = fitz.Document(path)
