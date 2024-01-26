@@ -188,17 +188,30 @@ class FalsiSignPy:
             try:
                 signatures[file.name] = Image.open(file)
             except OSError:
-                pass
+                print(f"Could not open signature file {file.name}.")
 
-        if len(signatures) == 0:
+        if not signatures:
             sg.popup_notify(
                 "No signatures found. Please select a folder containing signature images.",
                 title="No signatures found",
             )
             return
 
-        self._window["-DROPDOWN-"].update(values=list(signatures.keys()))
+        signature_filenames = list(signatures.keys())
+        self._window["-DROPDOWN-"].update(values=signature_filenames, set_to_index=0)
+        self._select_signature(signatures[signature_filenames[0]])
         self._loaded_signatures = signatures
+
+    def _select_signature(self, signature: Image) -> None:
+        self._selected_signature_image = signature
+        preview_size = self._window["-SIGNATURE-IMAGE-"].get_size()
+        padded_preview = utils.resize_and_pad_image(image=signature, target_size=preview_size)
+        self._window["-SIGNATURE-IMAGE-"].update(data=utils.image_to_bytes(padded_preview))
+
+    def _on_signature_selected(self, values: Dict[str, Any]) -> None:
+        selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
+        self._select_signature(selected_signature_image)
+        self._set_mode(Mode.EDIT)
 
     def _place_floating_signature(self, signature_image: Image.Image, cursor_xy: Tuple[int, int]) -> None:
         new_size = (
@@ -274,7 +287,7 @@ class FalsiSignPy:
             return
 
         is_mouse_wheel_up = self._graph.user_bind_event.delta > 0
-        self._signature_zoom_level += 0.1 if is_mouse_wheel_up else -0.1
+        self._signature_zoom_level *= 1.1 if is_mouse_wheel_up else 0.9
 
         cursor_xy = values["-GRAPH-"]
         self._place_floating_signature(self._selected_signature_image, cursor_xy)
@@ -282,16 +295,6 @@ class FalsiSignPy:
     def _set_mode(self, mode: Mode) -> None:
         self._mode = mode
         self._update_current_page()
-
-    def _on_signature_selected(self, values: Dict[str, Any]) -> None:
-        self._selected_signature_image = self._loaded_signatures[values["-DROPDOWN-"]]
-        signature_frame_size = self._window["-SIGNATURE-IMAGE-"].get_size()
-        self._window["-SIGNATURE-IMAGE-"].update(
-            data=utils.image_to_bytes(
-                utils.resize_and_pad_image(self._selected_signature_image, target_size=signature_frame_size)
-            )
-        )
-        self._set_mode(Mode.EDIT)
 
     def _on_graph_clicked(self, values: Dict[str, Any]) -> None:
         cursor_xy = values["-GRAPH-"]
