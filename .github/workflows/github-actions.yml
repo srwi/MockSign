@@ -1,0 +1,81 @@
+name: Testing
+
+on: [ push ]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install poetry
+        uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d  # v1.3.3
+        with:
+          virtualenvs-create: true
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+      - name: Run format check
+        run: |
+          set -o pipefail
+          poetry run poe format-check
+
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install poetry
+        uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d  # v1.3.3
+        with:
+          virtualenvs-create: true
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+      - name: Run mypy
+        run: |
+          set -o pipefail
+          poetry run poe mypy
+
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install poetry
+        uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d  # v1.3.3
+        with:
+          virtualenvs-create: true
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+      - name: Run ruff
+        run: |
+          set -o pipefail
+          poetry run poe ruff
+
+  test:
+    needs: [ format, mypy, ruff ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install poetry
+        uses: snok/install-poetry@d45b6d76012debf457ab49dffc7fb7b2efe8071d  # v1.3.3
+        with:
+          virtualenvs-create: true
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          poetry run poe test
