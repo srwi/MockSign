@@ -17,10 +17,29 @@ PySimpleGUI = "4.60.4"
 ruff = "0.1.9"
 mypy = "1.7.1"
 pytest = "7.4.3"
+poethepoet = "0.24.4"
+types-pillow = "^10.2.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poe.tasks]
+mypy = "mypy falsisignpy"
+format = "ruff format ."
+format-check = "ruff format . --check"
+ruff = "ruff check ."
+ruff-fix = "ruff --fix ."
+test = "pytest test"
+
+[tool.mypy]
+namespace_packages = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+warn_redundant_casts = true
+strict_equality = true
+warn_unreachable = true
+ignore_missing_imports = true
 
 [tool.ruff]
 exclude = [
