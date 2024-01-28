@@ -3,6 +3,7 @@ import os
 import pathlib as pl
 import platform
 from enum import Enum
+from functools import partial
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import PySimpleGUI as sg
@@ -89,6 +90,9 @@ class MockSign:
                     enable_events=True,
                 ),
                 sg.Stretch(),
+                sg.Text(f"{filter_.strength:.2f}", key=f"-{filter_.__class__.__name__.upper()}-STRENGTH-TEXT-")
+                if filter_.strength_range
+                else sg.Text(),
                 sg.Slider(
                     range=filter_.strength_range,
                     resolution=(filter_.strength_range[1] - filter_.strength_range[0]) / 100,
@@ -419,6 +423,14 @@ class MockSign:
     def _on_windown_closed(self, _: Dict[str, Any]) -> None:
         self._running = False
 
+    def _on_filter_strength_changed(self, values: Dict[str, Any], filter_: filter.Filter, key: str) -> None:
+        new_strength = values[f"-{key}-STRENGTH-"]
+        self._set_filter_strength(filter_, new_strength)
+        self._window[f"-{key}-STRENGTH-TEXT-"].update(f"{new_strength:.2f}")
+
+    def _on_filter_enabled_changed(self, values: Dict[str, Any], filter_: filter.Filter, key: str) -> None:
+        self._set_filter_enabled(filter_, values[f"-{key}-"])
+
     def start(self) -> None:
         self._running = True
 
@@ -447,11 +459,17 @@ class MockSign:
         self._event_handlers["-SAVE-"] = self._on_save_clicked
 
         for filter_ in self._filters:
-            key = filter_.__class__.__name__.upper()
-            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: self._set_filter_enabled(f, e[f"-{k}-"])  # type: ignore
+            filter_name_key = filter_.__class__.__name__.upper()
+            self._event_handlers[f"-{filter_name_key}-"] = partial(
+                self._on_filter_enabled_changed,
+                filter_=filter_,
+                key=filter_name_key,
+            )
             if filter_.strength_range is not None:
-                self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: self._set_filter_strength(  # type: ignore
-                    f, e[f"-{k}-STRENGTH-"]
+                self._event_handlers[f"-{filter_name_key}-STRENGTH-"] = partial(
+                    self._on_filter_strength_changed,
+                    filter_=filter_,
+                    key=filter_name_key,
                 )
 
         self._update_page_navigation()

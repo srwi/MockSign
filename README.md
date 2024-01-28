@@ -3,7 +3,7 @@
 Simulate the look of hand signed and scanned documents. MockSign is inspired
 by [FalsiSign](https://gitlab.com/edouardklein/falsisign) by Edouard Klein.
 
-![Screenshot](https://github.com/srwi/MockSign/assets/17520641/5c4a7e69-66e4-4b31-8fe4-575acaf4cc9f)
+![MockSign Screenshot](https://github.com/srwi/FalsiSignPy/assets/17520641/2ec12a25-ec97-4dca-a551-27a4d44c2602)
 
 ## Installation
 

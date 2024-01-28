@@ -29,7 +29,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poe.tasks]
-mypy = "mypy mocksign"
+mypy = "mypy ."
 format = "ruff format ."
 format-check = "ruff format . --check"
 ruff = "ruff check ."
@@ -55,7 +55,7 @@ exclude = [
 ]
 line-length = 120
 indent-width = 4
-target-version = "py310"
+target-version = "py38"
 
 [tool.ruff.lint]
 select = ["ANN", "E", "F", "I"]
