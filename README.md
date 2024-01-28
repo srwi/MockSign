@@ -3,6 +3,8 @@
 Simulate the look of hand signed and scanned documents. FalsiSignPy is inspired
 by [FalsiSign](https://gitlab.com/edouardklein/falsisign) by Edouard Klein.
 
+![Screenshot](https://github.com/srwi/FalsiSignPy/assets/17520641/5c4a7e69-66e4-4b31-8fe4-575acaf4cc9f)
+
 ## Installation
 
 Use the package manager [pip](https://pip.pypa.io/en/stable/) to install FalsiSignPy.
