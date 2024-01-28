@@ -4,8 +4,8 @@ from typing import Dict, List
 import fitz
 from PIL import Image
 
-from falsisignpy import filter
-from falsisignpy.signature import Signature
+from . import filter
+from .signature import Signature
 
 
 class PDF:

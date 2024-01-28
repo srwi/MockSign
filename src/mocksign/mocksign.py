@@ -8,9 +8,9 @@ from typing import Any, Callable, Dict, Optional, Tuple
 import PySimpleGUI as sg
 from PIL import Image
 
-from falsisignpy import filter, utils
-from falsisignpy.pdf import PDF
-from falsisignpy.signature import Signature
+from . import filter, utils
+from .pdf import PDF
+from .signature import Signature
 
 
 class Mode(Enum):
@@ -18,7 +18,7 @@ class Mode(Enum):
     PREVIEW = 2
 
 
-class FalsiSignPy:
+class MockSign:
     def __init__(self) -> None:
         self._running: bool = False
         self._window: sg.Window = None  # type: ignore
@@ -177,7 +177,7 @@ class FalsiSignPy:
             ],
         ]
 
-        return sg.Window("FalsiSignPy", layout, finalize=True, resizable=True)
+        return sg.Window("MockSign", layout, finalize=True, resizable=True)
 
     def _load_signatures(self, values: Dict[str, Any]) -> None:
         path = values["-SIGNATURE-BROWSE-"]
@@ -469,7 +469,7 @@ def main() -> None:
     if os.name == "nt" and int(platform.release()) >= 8:
         ctypes.windll.shcore.SetProcessDpiAwareness(True)  # type: ignore
 
-    app = FalsiSignPy()
+    app = MockSign()
     app.start()
 
 

@@ -1,13 +1,14 @@
 [tool.poetry]
-name = "falsisignpy"
+name = "mocksign"
 version = "0.1.0"
 description = ""
 authors = ["Stephan Rumswinkel <17520641+srwi@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [{include = "mocksign", from = "src"}]
 
 [tool.poetry.scripts]
-falsisignpy = "falsisignpy.falsisignpy:main"
+mocksign = "mocksign.mocksign:main"
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -28,7 +29,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poe.tasks]
-mypy = "mypy falsisignpy"
+mypy = "mypy mocksign"
 format = "ruff format ."
 format-check = "ruff format . --check"
 ruff = "ruff check ."

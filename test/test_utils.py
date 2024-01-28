@@ -3,7 +3,7 @@ from typing import Tuple
 import pytest
 from PIL import Image
 
-from falsisignpy import utils
+from src.mocksign import utils
 
 
 @pytest.mark.parametrize(
