@@ -21,8 +21,8 @@ class Mode(Enum):
 class FalsiSignPy:
     def __init__(self) -> None:
         self._running: bool = False
-        self._window: Optional[sg.Window] = None
-        self._graph: Optional[sg.Graph] = None
+        self._window: sg.Window = None  # type: ignore
+        self._graph: sg.Graph = None  # type: ignore
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
         self._current_page_figure_id: Optional[int] = None
@@ -32,7 +32,7 @@ class FalsiSignPy:
         self._loaded_signatures: Dict[str, Image.Image] = {}
         self._signature_zoom_level: float = 1.0
         self._scaling_factor: float = 1.0
-        self._pdf: Optional[PDF] = None
+        self._pdf: PDF = None  # type: ignore
         self._mode: Mode = Mode.EDIT
 
         self._filters = [
@@ -421,10 +421,10 @@ class FalsiSignPy:
     def start(self) -> None:
         self._running = True
 
-        self._window: sg.Window = self._create_window()
+        self._window = self._create_window()
         self._window.bind("<Configure>", "-CONFIGURE-")
 
-        self._graph: sg.Graph = self._window["-GRAPH-"]
+        self._graph = self._window["-GRAPH-"]
         self._graph.bind("<Leave>", "+LEAVE")
         self._graph.bind("<MouseWheel>", "+WHEEL")
 
@@ -447,9 +447,9 @@ class FalsiSignPy:
 
         for filter_ in self._filters:
             key = filter_.__class__.__name__.upper()
-            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: self._set_filter_enabled(f, e[f"-{k}-"])
+            self._event_handlers[f"-{key}-"] = lambda e, f=filter_, k=key: self._set_filter_enabled(f, e[f"-{k}-"])  # type: ignore
             if filter_.strength_range is not None:
-                self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: self._set_filter_strength(
+                self._event_handlers[f"-{key}-STRENGTH-"] = lambda e, f=filter_, k=key: self._set_filter_strength(  # type: ignore
                     f, e[f"-{k}-STRENGTH-"]
                 )
 
