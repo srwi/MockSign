@@ -1,10 +1,11 @@
 import pathlib as pl
 from typing import Dict, List
 
-import filter
 import fitz
 from PIL import Image
-from signature import Signature
+
+from falsisignpy import filter
+from falsisignpy.signature import Signature
 
 
 class PDF:

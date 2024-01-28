@@ -6,6 +6,9 @@ authors = ["Stephan Rumswinkel <17520641+srwi@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
 
+[tool.poetry.scripts]
+falsisignpy = "falsisignpy.falsisignpy:main"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 opencv-python = "4.9.0.80"

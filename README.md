@@ -7,10 +7,10 @@ by [FalsiSign](https://gitlab.com/edouardklein/falsisign) by Edouard Klein.
 
 ## Installation
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install FalsiSignPy.
+Use [pip](https://pip.pypa.io/en/stable/) to install FalsiSignPy with
 
 ```bash
-pip install FalsiSignPy
+pip install git+https://github.com/srwi/FalsiSignPy
 ```
 
 ## Usage

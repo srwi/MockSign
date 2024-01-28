@@ -5,12 +5,12 @@ import platform
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple
 
-import filter
 import PySimpleGUI as sg
-import utils
-from pdf import PDF
 from PIL import Image
-from signature import Signature
+
+from falsisignpy import filter, utils
+from falsisignpy.pdf import PDF
+from falsisignpy.signature import Signature
 
 
 class Mode(Enum):
@@ -464,10 +464,14 @@ class FalsiSignPy:
         self._window.close()
 
 
-if __name__ == "__main__":
+def main() -> None:
     # Enable DPI awareness on Windows 8 and above
     if os.name == "nt" and int(platform.release()) >= 8:
         ctypes.windll.shcore.SetProcessDpiAwareness(True)  # type: ignore
 
     app = FalsiSignPy()
     app.start()
+
+
+if __name__ == "__main__":
+    main()
