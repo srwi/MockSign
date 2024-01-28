@@ -1,9 +1,8 @@
 from typing import Tuple
 
 import pytest
+from mocksign import utils
 from PIL import Image
-
-from src.mocksign import utils
 
 
 @pytest.mark.parametrize(

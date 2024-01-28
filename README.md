@@ -1,7 +1,10 @@
 # MockSign
 
-Simulate the look of hand signed and scanned documents. MockSign is inspired
-by [FalsiSign](https://gitlab.com/edouardklein/falsisign) by Edouard Klein.
+![Build](https://github.com/srwi/MockSign/actions/workflows/github-actions.yml/badge.svg)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/srwi/MockSign/blob/master/LICENSE)
+
+Simulate the look of hand signed and scanned documents. MockSign draws inspiration from
+[FalsiSign](https://gitlab.com/edouardklein/falsisign), developed by Edouard Klein.
 
 ![MockSign Screenshot](https://github.com/srwi/FalsiSignPy/assets/17520641/2ec12a25-ec97-4dca-a551-27a4d44c2602)
 

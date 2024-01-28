@@ -278,6 +278,8 @@ class MockSign:
             return
 
         page_signatures = self._pdf.get_page_signatures(self._current_page)
+        for id_ in self._pdf.get_page_signature_ids(self._current_page):
+            self._graph.delete_figure(id_)
         self._pdf.clear_page_signatures(self._current_page)
         for signature in page_signatures:
             scaled_signature = signature.get_scaled_signature()
