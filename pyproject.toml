@@ -10,6 +10,14 @@ packages = [{include = "mocksign", from = "src"}]
 [tool.poetry.scripts]
 mocksign = "mocksign.mocksign:main"
 
+[tool.pytest.ini_options]
+pythonpath = [
+    "src"
+]
+testpaths = [
+    "test"
+]
+
 [tool.poetry.dependencies]
 python = "^3.8"
 opencv-python = "4.9.0.80"
