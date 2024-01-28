@@ -2,6 +2,7 @@ import abc
 import random
 from typing import Optional, Tuple
 
+import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 from PIL.Image import Resampling
 
@@ -81,3 +82,14 @@ class Rotate(Filter):
 
         random_strength = random.uniform(-float(self.strength), float(self.strength))
         return image.rotate(angle=random_strength, fillcolor="white", resample=Resampling.BILINEAR)
+
+
+class Noise(Filter):
+    def _apply(self, image: Image.Image) -> Image.Image:
+        if self.strength is None:
+            return image
+
+        image_array = np.array(image)
+        salt_mask = np.random.random(image_array.shape[:2]) < (self.strength / 1000)
+        image_array[salt_mask] = np.random.randint(0, 255)
+        return Image.fromarray(image_array)

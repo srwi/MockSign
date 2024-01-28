@@ -5,8 +5,8 @@ import platform
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple
 
+import filter
 import PySimpleGUI as sg
-import scanner
 import utils
 from pdf import PDF
 from PIL import Image
@@ -36,10 +36,11 @@ class FalsiSignPy:
         self._mode: Mode = Mode.EDIT
 
         self._filters = [
-            scanner.Grayscale("Grayscale", enabled=True),
-            scanner.Blur("Blur", enabled=False, initial_strength=1, strength_range=(0, 20)),
-            scanner.Rotate("Random rotate", enabled=True, initial_strength=1, strength_range=(0, 10)),
-            scanner.AutoContrast("Autocontrast cutoff", enabled=True, initial_strength=2, strength_range=(0, 45)),
+            filter.Grayscale("Grayscale", enabled=True),
+            filter.Noise("Noise", enabled=False, initial_strength=0.1, strength_range=(0, 1)),
+            filter.Blur("Blur", enabled=False, initial_strength=1, strength_range=(0, 5)),
+            filter.Rotate("Random rotate", enabled=True, initial_strength=1, strength_range=(0, 10)),
+            filter.AutoContrast("Autocontrast cutoff", enabled=True, initial_strength=2, strength_range=(0, 45)),
         ]
 
     def _create_window(self) -> sg.Window:
@@ -54,7 +55,7 @@ class FalsiSignPy:
         signature_options = [
             [
                 sg.Text("Selected signature:"),
-                sg.Combo([], key="-DROPDOWN-", enable_events=True, readonly=True, expand_x=True),
+                sg.Combo([], key="-DROPDOWN-", enable_events=True, readonly=True, expand_x=True, disabled=True),
                 sg.FolderBrowse("Browse", key="-SIGNATURE-BROWSE-", target="-SIGNATURE-BROWSE-", enable_events=True),
             ],
             [
@@ -198,7 +199,7 @@ class FalsiSignPy:
             return
 
         signature_filenames = list(signatures.keys())
-        self._window["-DROPDOWN-"].update(values=signature_filenames, set_to_index=0)
+        self._window["-DROPDOWN-"].update(values=signature_filenames, set_to_index=0, disabled=False)
         self._select_signature(signatures[signature_filenames[0]])
         self._loaded_signatures = signatures
 
@@ -402,11 +403,11 @@ class FalsiSignPy:
             current_page = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
             self._update_page(current_page)
 
-    def _set_filter_enabled(self, filter_: scanner.Filter, value: bool) -> None:
+    def _set_filter_enabled(self, filter_: filter.Filter, value: bool) -> None:
         filter_.set_enabled(value)
         self._update_current_page()
 
-    def _set_filter_strength(self, filter_: scanner.Filter, value: float) -> None:
+    def _set_filter_strength(self, filter_: filter.Filter, value: float) -> None:
         filter_.set_strength(value)
         self._update_current_page()
 
@@ -466,7 +467,7 @@ class FalsiSignPy:
 if __name__ == "__main__":
     # Enable DPI awareness on Windows 8 and above
     if os.name == "nt" and int(platform.release()) >= 8:
-        ctypes.windll.shcore.SetProcessDpiAwareness(True)
+        ctypes.windll.shcore.SetProcessDpiAwareness(True)  # type: ignore
 
     app = FalsiSignPy()
     app.start()

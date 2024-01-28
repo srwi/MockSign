@@ -1,8 +1,8 @@
 import pathlib as pl
 from typing import Dict, List
 
+import filter
 import fitz
-import scanner
 from PIL import Image
 from signature import Signature
 
@@ -51,7 +51,7 @@ class PDF:
 
         self._signatures[page_number] = {}
 
-    def save(self, path: pl.Path, filters: List[scanner.Filter]) -> None:
+    def save(self, path: pl.Path, filters: List[filter.Filter]) -> None:
         if len(self._pages) == 0:
             raise RuntimeError("Can not save empty document.")
 
