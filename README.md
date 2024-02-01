@@ -14,7 +14,7 @@ Simulate the look of hand-signed and scanned documents. MockSign is a simple too
 Use pip to install MockSign with
 
 ```bash
-pip install git+https://github.com/srwi/MockSign
+pip install mocksign
 ```
 
 ## Usage
