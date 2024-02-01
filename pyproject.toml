@@ -1,10 +1,11 @@
 [tool.poetry]
 name = "mocksign"
 version = "0.1.0"
-description = ""
+description = "Easily simulate printing, hand-signing and scanning of documents, inspired by FalsiSign."
 authors = ["Stephan Rumswinkel <17520641+srwi@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/srwi/mocksign"
 packages = [{include = "mocksign", from = "src"}]
 
 [tool.poetry.scripts]

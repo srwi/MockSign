@@ -1,7 +1,9 @@
 # MockSign
 
+[![image](https://img.shields.io/pypi/v/mocksign.svg)](https://pypi.python.org/pypi/mocksign)
 ![Build](https://github.com/srwi/MockSign/actions/workflows/github-actions.yml/badge.svg)
-[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/srwi/MockSign/blob/master/LICENSE)
+[![image](https://img.shields.io/pypi/l/mocksign.svg)](https://pypi.python.org/pypi/mocksign)
+[![image](https://img.shields.io/pypi/pyversions/mocksign.svg)](https://pypi.python.org/pypi/mocksign)
 
 Simulate the look of hand-signed and scanned documents. MockSign is a simple tool to help you shortcut the tedious process of printing, hand-signing and scanning documents.
 
