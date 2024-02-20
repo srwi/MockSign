@@ -31,7 +31,6 @@ class PDF:
                 raise RuntimeError(f"Signature with identifier {identifier} already exists on page {i}.")
 
         self._signatures[page_number][identifier] = signature
-        print(self._signatures)
 
     def delete_signature(self, identifier: int) -> None:
         for i, page_signatures in enumerate(self._signatures):
