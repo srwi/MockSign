@@ -324,7 +324,11 @@ class MockSign:
         if not values["-PLACE-"] or not self._selected_signature_image:
             return
 
-        is_mouse_wheel_up = self._graph.user_bind_event.delta > 0
+        if self._graph.user_bind_event.delta != 0:
+            is_mouse_wheel_up = self._graph.user_bind_event.delta > 0
+        else:
+            # Linux does not provide the delta value, so we need to infer it from the event number
+            is_mouse_wheel_up = self._graph.user_bind_event.num == 4
         self._signature_zoom_level *= 1.1 if is_mouse_wheel_up else 0.9
 
         cursor_xy = values["-GRAPH-"]
@@ -441,7 +445,9 @@ class MockSign:
 
         self._graph = self._window["-GRAPH-"]
         self._graph.bind("<Leave>", "+LEAVE")
-        self._graph.bind("<MouseWheel>", "+WHEEL")
+        self._graph.bind("<MouseWheel>", "+WHEEL")  # Windows event
+        self._graph.bind("<Button-4>", "+WHEEL")  # Linux event
+        self._graph.bind("<Button-5>", "+WHEEL")  # Linux event
 
         self._event_handlers[sg.WIN_CLOSED] = self._on_windown_closed
         self._event_handlers["-CONFIGURE-"] = self._on_window_resized
