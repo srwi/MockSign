@@ -6,7 +6,7 @@ from enum import Enum
 from functools import partial
 from typing import Any, Callable, Dict, Optional, Tuple
 
-import PySimpleGUI as sg
+import FreeSimpleGUI as sg
 from PIL import Image
 
 from . import filter, utils
@@ -23,6 +23,7 @@ class MockSign:
     def __init__(self) -> None:
         self._running: bool = False
         self._window: sg.Window = None  # type: ignore
+        self._window_size: Tuple[int, int] = (0, 0)
         self._graph: sg.Graph = None  # type: ignore
         self._event_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {}
 
@@ -409,6 +410,12 @@ class MockSign:
         self._window["-SAVE-"].update(disabled=False)
 
     def _on_window_resized(self, _: Dict[str, Any]) -> None:
+        new_window_size = self._window.size
+        if new_window_size == self._window_size:
+            return
+
+        self._window_size = new_window_size
+
         if self._pdf is not None and self._pdf.loaded:
             current_page = self._pdf.get_page_image(self._current_page, signed=self._mode == Mode.PREVIEW)
             self._update_page(current_page)

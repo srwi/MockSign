@@ -43,8 +43,7 @@ class Filter(abc.ABC):
         self._strength = value
 
     @abc.abstractmethod
-    def _apply(self, image: Image.Image) -> Image.Image:
-        ...
+    def _apply(self, image: Image.Image) -> Image.Image: ...
 
     def apply(self, image: Image.Image) -> Image.Image:
         if not self._enabled:

@@ -18,7 +18,7 @@ def seamless_clone(image: Image.Image, signature: Image.Image, location: Tuple[i
     location_center = (x + cropped_signature.shape[1] // 2, y + cropped_signature.shape[0] // 2)
     mask = np.ones_like(cropped_signature) * 255
 
-    cloned_image = seamlessClone(
+    target_image = seamlessClone(
         src=cropped_signature,
         dst=target_image,
         mask=mask,
@@ -26,7 +26,7 @@ def seamless_clone(image: Image.Image, signature: Image.Image, location: Tuple[i
         flags=cv2.MIXED_CLONE,
     )
 
-    return Image.fromarray(cloned_image)
+    return Image.fromarray(target_image)
 
 
 class Signature:

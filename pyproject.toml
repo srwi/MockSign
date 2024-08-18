@@ -21,16 +21,16 @@ testpaths = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-opencv-python = "4.9.0.80"
-Pillow = "9.3.0"
-PyMuPDF = "1.21.0"
-PySimpleGUI = "4.60.4"
+opencv-python = "4.10.0.84"
+Pillow = "10.4.0"
+PyMuPDF = "1.24.9"
+FreeSimpleGUI = "5.1.1"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "0.1.9"
-mypy = "1.7.1"
-pytest = "7.4.3"
-poethepoet = "0.24.4"
+ruff = "0.6.1"
+mypy = "1.11.1"
+pytest = "8.3.2"
+poethepoet = "0.27.0"
 types-pillow = "^10.2.0"
 
 [build-system]
@@ -42,7 +42,7 @@ mypy = "mypy ."
 format = "ruff format ."
 format-check = "ruff format . --check"
 ruff = "ruff check ."
-ruff-fix = "ruff --fix ."
+ruff-fix = "ruff check --fix ."
 test = "pytest test"
 
 [tool.mypy]
