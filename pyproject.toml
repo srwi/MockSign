@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mocksign"
-version = "0.1.1"
+version = "0.1.2"
 description = "Easily simulate printing, hand-signing and scanning of documents, inspired by FalsiSign."
 authors = ["Stephan Rumswinkel <17520641+srwi@users.noreply.github.com>"]
 license = "MIT"
